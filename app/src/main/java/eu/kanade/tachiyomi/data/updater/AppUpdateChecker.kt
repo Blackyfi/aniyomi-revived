@@ -42,9 +42,9 @@ class AppUpdateChecker {
 
 val GITHUB_REPO: String by lazy {
     if (isPreviewBuildType) {
-        "aniyomiorg/aniyomi-preview"
+        "Blackyfi/aniyomi-revived-preview"
     } else {
-        "aniyomiorg/aniyomi"
+        "Blackyfi/aniyomi-revived"
     }
 }
 
