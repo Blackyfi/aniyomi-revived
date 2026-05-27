@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.core.net.toUri
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
+import eu.kanade.tachiyomi.data.track.TrackerOAuthState
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALAddEntryResult
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALCurrentUserResult
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALOAuth
@@ -584,6 +585,7 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
         fun authUrl(): Uri = "${BASE_URL}oauth/authorize".toUri().buildUpon()
             .appendQueryParameter("client_id", CLIENT_ID)
             .appendQueryParameter("response_type", "token")
+            .appendQueryParameter("state", TrackerOAuthState.create())
             .build()
     }
 }

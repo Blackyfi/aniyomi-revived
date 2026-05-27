@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.core.net.toUri
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
+import eu.kanade.tachiyomi.data.track.TrackerOAuthState
 import eu.kanade.tachiyomi.data.track.bangumi.dto.BGMCollectionResponse
 import eu.kanade.tachiyomi.data.track.bangumi.dto.BGMOAuth
 import eu.kanade.tachiyomi.data.track.bangumi.dto.BGMSearchResult
@@ -281,6 +282,7 @@ class BangumiApi(
                 .appendQueryParameter("client_id", CLIENT_ID)
                 .appendQueryParameter("response_type", "code")
                 .appendQueryParameter("redirect_uri", REDIRECT_URL)
+                .appendQueryParameter("state", TrackerOAuthState.create())
                 .build()
 
         fun refreshTokenRequest(token: String) = POST(

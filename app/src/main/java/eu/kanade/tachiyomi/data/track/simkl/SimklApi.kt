@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.track.simkl
 import android.net.Uri
 import androidx.core.net.toUri
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
+import eu.kanade.tachiyomi.data.track.TrackerOAuthState
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.simkl.dto.SimklOAuth
 import eu.kanade.tachiyomi.data.track.simkl.dto.SimklSearchResult
@@ -250,6 +251,7 @@ class SimklApi(private val client: OkHttpClient, interceptor: SimklInterceptor) 
                 .appendQueryParameter("response_type", "code")
                 .appendQueryParameter("client_id", CLIENT_ID)
                 .appendQueryParameter("redirect_uri", REDIRECT_URL)
+                .appendQueryParameter("state", TrackerOAuthState.create())
                 .build()
     }
 }
