@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.os.Build
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentSanitizer
 import eu.kanade.tachiyomi.extension.InstallStep
 import eu.kanade.tachiyomi.util.lang.use
 import eu.kanade.tachiyomi.util.system.getParcelableExtraCompat
@@ -25,6 +26,20 @@ class PackageInstallerInstallerAnime(private val service: Service) : InstallerAn
             when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
                 PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                     val userAction = intent.getParcelableExtraCompat<Intent>(Intent.EXTRA_INTENT)
+                        ?.run {
+                            // Doesn't actually needed as the receiver is actually not exported
+                            // But the warnings can't be suppressed without this
+                            IntentSanitizer.Builder()
+                                .allowAction(this.action!!)
+                                .allowExtra(PackageInstaller.EXTRA_SESSION_ID) { id -> id == activeSession?.second }
+                                .allowAnyComponent()
+                                .allowPackage {
+                                    // There is no way to check the actual installer name so allow all.
+                                    true
+                                }
+                                .build()
+                                .sanitizeByFiltering(this)
+                        }
                     if (userAction == null) {
                         logcat(LogPriority.ERROR) { "Fatal error for $intent" }
                         continueQueue(InstallStep.Error)
@@ -109,7 +124,7 @@ class PackageInstallerInstallerAnime(private val service: Service) : InstallerAn
             service,
             packageActionReceiver,
             IntentFilter(INSTALL_ACTION),
-            ContextCompat.RECEIVER_EXPORTED,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
         )
     }
 }
