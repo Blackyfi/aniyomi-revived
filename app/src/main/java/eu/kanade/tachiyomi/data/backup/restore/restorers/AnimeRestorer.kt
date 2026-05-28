@@ -60,35 +60,50 @@ class AnimeRestorer(
         backupSeasons: List<BackupAnime>,
     ) {
         handler.await(inTransaction = true) {
-            val dbAnime = findExistingAnime(backupAnime)
-            val anime = backupAnime.getAnimeImpl()
-            val restoredAnime = if (dbAnime == null) {
-                restoreNewAnime(anime)
-            } else {
-                restoreExistingAnime(anime, dbAnime)
-            }
+            // Restore the parent first so its freshly-assigned database id is known, then
+            // re-point each season at that id. Seasons are NOT processed as standalone
+            // top-level entries (see BackupRestorer.restoreAnime), so this is the only place
+            // they are restored — restoring them here with the resolved parentId avoids the
+            // previous bug where a season's parentId was overwritten with a stale,
+            // backup-time id that matches no row after a cross-device restore.
+            val restoredAnime = restoreAnimeWithDetails(
+                backupAnime = backupAnime,
+                backupCategories = backupCategories,
+                parentId = null,
+            )
 
-            backupSeasons.forEach { bs ->
-                val dbAnime = findExistingAnime(bs)
-                val anime = bs.getAnimeImpl().copy(
+            backupSeasons.forEach { season ->
+                restoreAnimeWithDetails(
+                    backupAnime = season,
+                    backupCategories = backupCategories,
                     parentId = restoredAnime.id,
                 )
-                if (dbAnime == null) {
-                    restoreNewAnime(anime)
-                } else {
-                    restoreExistingAnime(anime, dbAnime)
-                }
             }
-
-            restoreAnimeDetails(
-                anime = restoredAnime,
-                episodes = backupAnime.episodes,
-                categories = backupAnime.categories,
-                backupCategories = backupCategories,
-                history = backupAnime.history,
-                tracks = backupAnime.tracking,
-            )
         }
+    }
+
+    private suspend fun restoreAnimeWithDetails(
+        backupAnime: BackupAnime,
+        backupCategories: List<BackupCategory>,
+        parentId: Long?,
+    ): Anime {
+        val dbAnime = findExistingAnime(backupAnime)
+        val anime = backupAnime.getAnimeImpl().copy(parentId = parentId)
+        val restoredAnime = if (dbAnime == null) {
+            restoreNewAnime(anime)
+        } else {
+            restoreExistingAnime(anime, dbAnime)
+        }
+
+        restoreAnimeDetails(
+            anime = restoredAnime,
+            episodes = backupAnime.episodes,
+            categories = backupAnime.categories,
+            backupCategories = backupCategories,
+            history = backupAnime.history,
+            tracks = backupAnime.tracking,
+        )
+        return restoredAnime
     }
 
     private suspend fun findExistingAnime(backupAnime: BackupAnime): Anime? {
