@@ -163,7 +163,11 @@ private class ReSmushItDataSaver(preferences: SourcePreferences) : DataSaver {
 
     private fun getUrl(imageUrl: String): String {
         // Network Request sent to resmush
-        return client.newCall(GET("http://api.resmush.it/ws.php?img=$imageUrl&qlty=$quality")).execute()
-            .body.string().substringAfter("\"dest\":\"").substringBefore("\",")
+        val body = client.newCall(GET("http://api.resmush.it/ws.php?img=$imageUrl&qlty=$quality")).execute()
+            .body.string()
+        // On error/HTML responses the "dest" marker is absent; fall back to the original URL
+        // instead of returning the whole response body as a bogus image URL.
+        val dest = body.substringAfter("\"dest\":\"", "").substringBefore("\",", "")
+        return dest.ifEmpty { imageUrl }
     }
 }
