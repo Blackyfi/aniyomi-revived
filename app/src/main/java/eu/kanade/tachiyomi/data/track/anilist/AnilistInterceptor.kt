@@ -29,20 +29,19 @@ class AnilistInterceptor(val anilist: Anilist, private var token: String?) : Int
         if (oauth == null) {
             oauth = anilist.loadOAuth()
         }
-        // Refresh access token if null or expired.
-        if (oauth!!.isExpired()) {
+
+        // Throw on null auth (e.g. missing or corrupt stored token).
+        val currAuth = oauth ?: throw IOException("No authentication token")
+
+        // Refresh access token if expired.
+        if (currAuth.isExpired()) {
             anilist.logout()
             throw IOException("Token expired")
         }
 
-        // Throw on null auth.
-        if (oauth == null) {
-            throw IOException("No authentication token")
-        }
-
         // Add the authorization header to the original request.
         val authRequest = originalRequest.newBuilder()
-            .addHeader("Authorization", "Bearer ${oauth!!.accessToken}")
+            .addHeader("Authorization", "Bearer ${currAuth.accessToken}")
             .header("User-Agent", "Aniyomi v${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID})")
             .build()
 
