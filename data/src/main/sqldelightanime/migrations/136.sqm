@@ -1,0 +1,17 @@
+-- Re-map episode_flags after the seasons/fillermark feature reassigned the sort/filter bits.
+--
+-- Before: sorting lived in mask 0x300 (SOURCE=0x000, NUMBER=0x100, UPLOAD_DATE=0x200),
+--         and bits 0x080/0x100 were unused.
+-- After:  sorting moved to mask 0x600 (NUMBER=0x200, UPLOAD_DATE=0x400, ALPHABET=0x600),
+--         and bits 0x080/0x100 now hold the fillermark filter (mask 0x180).
+--
+-- The sort value therefore shifts left by one bit. We clear the affected region
+-- (0x780 = old sorting 0x300 | new sorting 0x600 | fillermark 0x180), then OR the
+-- shifted sort value back in. The fillermark filter is left at 0 (DISABLED / show all)
+-- for existing rows.
+--
+-- Note: old-layout and new-layout values overlap, so this conversion is only correct for
+-- databases written before the seasons feature. Rows already written in the new layout
+-- cannot be distinguished and may be re-mapped; this is an accepted, one-time trade-off.
+UPDATE animes
+SET episode_flags = (episode_flags & ~0x780) | ((episode_flags & 0x300) << 1);
