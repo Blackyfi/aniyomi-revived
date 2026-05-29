@@ -83,7 +83,7 @@ class BackupRestorer(
 
         // Store source mapping for error messages
         val backupAnimeMaps = backup.backupAnimeSources
-        mangaSourceMapping = backupAnimeMaps.associate { it.sourceId to it.name }
+        animeSourceMapping = backupAnimeMaps.associate { it.sourceId to it.name }
         val backupMangaMaps = backup.backupSources
         mangaSourceMapping = backupMangaMaps.associate { it.sourceId to it.name }
 
@@ -161,11 +161,22 @@ class BackupRestorer(
         backupAnimes: List<BackupAnime>,
         backupAnimeCategories: List<BackupCategory>,
     ) = launch {
-        animeRestorer.sortByNew(backupAnimes)
+        // Only iterate top-level entries; seasons are restored together with their parent.
+        // Seasons whose parent is missing from the backup are promoted to top-level so they
+        // aren't silently dropped.
+        val backupAnimeIds = backupAnimes.mapNotNull { it.id }.toSet()
+        val topLevelAnimes = backupAnimes.filter { it.parentId == null || it.parentId !in backupAnimeIds }
+
+        animeRestorer.sortByNew(topLevelAnimes)
             .forEach {
                 ensureActive()
 
-                val seasons = backupAnimes.filter { s -> s.parentId == it.id }
+                // A null id can't own seasons; guard against matching other null parentIds.
+                val seasons = if (it.id == null) {
+                    emptyList()
+                } else {
+                    backupAnimes.filter { s -> s.parentId == it.id }
+                }
                 try {
                     animeRestorer.restore(it, backupAnimeCategories, seasons)
                 } catch (e: Exception) {
@@ -173,7 +184,9 @@ class BackupRestorer(
                     errors.add(Date() to "${it.title} [$sourceName]: ${e.message}")
                 }
 
-                restoreProgress += 1
+                // Seasons are restored within restore() above but counted in restoreAmount,
+                // so advance progress by the parent plus all of its seasons.
+                restoreProgress += 1 + seasons.size
                 notifier.showRestoreProgress(it.title, restoreProgress, restoreAmount, isSync)
             }
     }

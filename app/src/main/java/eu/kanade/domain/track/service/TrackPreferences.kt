@@ -34,6 +34,12 @@ class TrackPreferences(
 
     fun trackToken(tracker: Tracker) = preferenceStore.getString(Preference.privateKey("track_token_${tracker.id}"), "")
 
+    /**
+     * Transient OAuth 2.0 `state` for the in-progress tracker login flow, used to protect
+     * against CSRF / authorization-code injection. Only one login runs at a time.
+     */
+    fun trackAuthState() = preferenceStore.getString(Preference.privateKey("pref_tracker_oauth_state"), "")
+
     fun anilistScoreType() = preferenceStore.getString("anilist_score_type", Anilist.POINT_10)
 
     fun autoUpdateTrack() = preferenceStore.getBoolean("pref_auto_update_manga_sync_key", true)

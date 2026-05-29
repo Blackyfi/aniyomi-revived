@@ -77,9 +77,8 @@ class AndroidAnimeSourceManager(
         scope.launch {
             sourceRepository.subscribeAllAnime()
                 .collectLatest { sources ->
-                    val mutableMap = stubSourcesMap.toMutableMap()
                     sources.forEach {
-                        mutableMap[it.id] = it
+                        stubSourcesMap[it.id] = it
                     }
                 }
         }
