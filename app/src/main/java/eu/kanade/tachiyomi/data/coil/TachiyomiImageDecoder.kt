@@ -85,6 +85,7 @@ class TachiyomiImageDecoder(private val resources: ImageSource, private val opti
     }
 
     companion object {
+        @Volatile
         var displayProfile: ByteArray? = null
     }
 }

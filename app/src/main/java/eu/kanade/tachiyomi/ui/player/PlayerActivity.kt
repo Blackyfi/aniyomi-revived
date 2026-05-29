@@ -48,6 +48,7 @@ import androidx.activity.viewModels
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -968,7 +969,7 @@ class PlayerActivity : BaseActivity() {
         }
 
         val filter = IntentFilter().apply { addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY) }
-        registerReceiver(noisyReceiver, filter)
+        ContextCompat.registerReceiver(this, noisyReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         noisyReceiver.initialized = true
     }
 

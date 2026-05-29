@@ -848,7 +848,7 @@ class AnimeDownloader(
     }
 
     fun updateQueue(downloads: List<AnimeDownload>) {
-        if (queueState == downloads) return
+        if (queueState.value == downloads) return
 
         if (downloads.isEmpty()) {
             clearQueue()

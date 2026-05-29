@@ -6,14 +6,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
+import androidx.core.content.getSystemService
 
 fun isTvBox(context: Context): Boolean {
     val pm: PackageManager = context.packageManager
 
     // TV for sure
     if (
-        context.getSystemService(UiModeManager::class.java)
-            .getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION
+        context.getSystemService<UiModeManager>()
+            ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
     ) {
         return true
     }
@@ -27,7 +28,7 @@ fun isTvBox(context: Context): Boolean {
     }
 
     // Legacy storage no longer works on Android 11 (level 30)
-    if (Build.VERSION.SDK_INT < 30) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
         // (Some boxes still report touchscreen feature)
         if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {
             return true
