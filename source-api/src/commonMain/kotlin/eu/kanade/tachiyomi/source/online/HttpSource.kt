@@ -281,10 +281,13 @@ abstract class HttpSource : CatalogueSource {
 
     /**
      * Parses the response from the site and returns a SChapter Object.
+     * Defaults to throwing — most sources do not use it; override only when needed.
+     * (Kept non-abstract so sources ported from upstream-compatible repos compile unchanged.)
      *
      * @param response the response from the site.
      */
-    protected abstract fun chapterPageParse(response: Response): SChapter
+    protected open fun chapterPageParse(response: Response): SChapter =
+        throw UnsupportedOperationException()
 
     /**
      * Get the list of pages a chapter has. Pages should be returned
