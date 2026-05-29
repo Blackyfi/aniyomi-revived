@@ -255,11 +255,8 @@ private fun ExtensionContent(
     }
     if (trustState != null) {
         ExtensionTrustDialog(
-            onClickConfirm = {
-                onTrustExtension(trustState!!)
-                trustState = null
-            },
-            onClickDismiss = {
+            // Deny-by-default: an untrusted extension can only be uninstalled, never manually trusted.
+            onClickUninstall = {
                 onUninstallExtension(trustState!!)
                 trustState = null
             },
@@ -520,8 +517,7 @@ fun ExtensionHeader(
 
 @Composable
 fun ExtensionTrustDialog(
-    onClickConfirm: () -> Unit,
-    onClickDismiss: () -> Unit,
+    onClickUninstall: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
     AlertDialog(
@@ -532,13 +528,13 @@ fun ExtensionTrustDialog(
             Text(text = stringResource(MR.strings.untrusted_extension_message))
         },
         confirmButton = {
-            TextButton(onClick = onClickConfirm) {
-                Text(text = stringResource(MR.strings.ext_trust))
+            TextButton(onClick = onClickUninstall) {
+                Text(text = stringResource(MR.strings.ext_uninstall))
             }
         },
         dismissButton = {
-            TextButton(onClick = onClickDismiss) {
-                Text(text = stringResource(MR.strings.ext_uninstall))
+            TextButton(onClick = onDismissRequest) {
+                Text(text = stringResource(MR.strings.action_cancel))
             }
         },
         onDismissRequest = onDismissRequest,
