@@ -6,6 +6,8 @@ import eu.kanade.tachiyomi.data.backup.models.Backup
 import eu.kanade.tachiyomi.data.backup.models.LegacyBackup
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.protobuf.ProtoBuf
+import okio.Buffer
+import okio.BufferedSource
 import okio.buffer
 import okio.gzip
 import okio.source
@@ -36,7 +38,7 @@ class BackupDecoder(
                     throw IOException(context.stringResource(MR.strings.invalid_backup_file_json))
                 }
                 else -> source
-            }.use { it.readByteArray() }
+            }.use { it.readByteArrayCapped() }
 
             try {
                 if (BackupDetector.isLegacyBackup(backupString)) {
@@ -51,9 +53,32 @@ class BackupDecoder(
         }
     }
 
+    /**
+     * Reads the (decompressed) stream fully, aborting if it exceeds [MAX_BACKUP_SIZE]. This
+     * prevents a small crafted gzip "decompression bomb" from expanding into a multi-gigabyte
+     * array and crashing the app with an OutOfMemoryError on import.
+     */
+    private fun BufferedSource.readByteArrayCapped(): ByteArray {
+        val buffer = Buffer()
+        var total = 0L
+        while (true) {
+            val read = read(buffer, READ_CHUNK)
+            if (read == -1L) break
+            total += read
+            if (total > MAX_BACKUP_SIZE) {
+                throw IOException(context.stringResource(MR.strings.invalid_backup_file_unknown))
+            }
+        }
+        return buffer.readByteArray()
+    }
+
     companion object {
         private const val MAGIC_JSON_SIGNATURE1 = 0x7b7d // `{}`
         private const val MAGIC_JSON_SIGNATURE2 = 0x7b22 // `{"`
         private const val MAGIC_JSON_SIGNATURE3 = 0x7b0a // `{\n`
+
+        // Generous upper bound for a decompressed backup (metadata only, no images).
+        private const val MAX_BACKUP_SIZE = 200L * 1024 * 1024
+        private const val READ_CHUNK = 64L * 1024
     }
 }
