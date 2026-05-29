@@ -14,6 +14,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.entries.anime.model.Anime
 import java.time.OffsetDateTime
+import java.time.format.DateTimeParseException
 import java.util.Calendar
 
 class AniChartApi {
@@ -158,8 +159,12 @@ class AniChartApi {
     }
 
     private fun toUnixTimestamp(dateFormat: String): Long {
-        val offsetDateTime = OffsetDateTime.parse(dateFormat)
-        val instant = offsetDateTime.toInstant()
-        return instant.epochSecond
+        // Guard against malformed/changed payloads; a parse failure here would otherwise
+        // propagate out of the screen-model coroutine and crash the app.
+        return try {
+            OffsetDateTime.parse(dateFormat).toInstant().epochSecond
+        } catch (_: DateTimeParseException) {
+            0L
+        }
     }
 }
