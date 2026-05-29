@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.core.net.toUri
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
+import eu.kanade.tachiyomi.data.track.TrackerOAuthState
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALAnime
@@ -392,7 +393,9 @@ class MyAnimeListApi(
         fun authUrl(): Uri = "$BASE_OAUTH_URL/authorize".toUri().buildUpon()
             .appendQueryParameter("client_id", CLIENT_ID)
             .appendQueryParameter("code_challenge", getPkceChallengeCode())
+            .appendQueryParameter("code_challenge_method", "S256")
             .appendQueryParameter("response_type", "code")
+            .appendQueryParameter("state", TrackerOAuthState.create())
             .build()
 
         fun mangaUrl(id: Long): Uri = "$BASE_API_URL/manga".toUri().buildUpon()
@@ -424,7 +427,9 @@ class MyAnimeListApi(
 
         private fun getPkceChallengeCode(): String {
             codeVerifier = PkceUtil.generateCodeVerifier()
-            return codeVerifier
+            // Send the S256 challenge; the raw verifier (codeVerifier) is sent later at the
+            // token endpoint (see code_verifier in getAccessToken).
+            return PkceUtil.generateCodeChallenge(codeVerifier)
         }
     }
 }
