@@ -5,13 +5,10 @@
         cleartextTrafficPermitted="true"
         tools:ignore="InsecureBaseConfiguration">
         <trust-anchors>
-            <!-- Trust preinstalled CAs -->
+            <!-- Trust preinstalled CAs. User-added CAs are trusted in debug builds only
+                 (see src/debug/res/xml/network_security_config.xml) so release builds are not
+                 exposed to user-installed interception certificates. -->
             <certificates src="system" />
-
-            <!-- Additionally trust user added CAs -->
-            <certificates
-                src="user"
-                tools:ignore="AcceptsUserCertificates" />
         </trust-anchors>
     </base-config>
 </network-security-config>

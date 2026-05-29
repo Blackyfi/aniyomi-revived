@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.setting.track
 
 import android.net.Uri
 import androidx.lifecycle.lifecycleScope
+import eu.kanade.tachiyomi.data.track.TrackerOAuthState
 import tachiyomi.core.common.util.lang.launchIO
 
 class TrackLoginActivity : BaseOAuthLoginActivity() {
@@ -17,11 +18,13 @@ class TrackLoginActivity : BaseOAuthLoginActivity() {
     }
 
     private fun handleAnilist(data: Uri) {
-        val regex = "(?:access_token=)(.*?)(?:&)".toRegex()
-        val matchResult = regex.find(data.fragment.toString())
-        if (matchResult?.groups?.get(1) != null) {
+        val fragment = data.fragment.orEmpty()
+        val token = "(?:access_token=)(.*?)(?:&)".toRegex().find(fragment)?.groups?.get(1)?.value
+        val state = "(?:state=)(.*?)(?:&|$)".toRegex().find(fragment)?.groups?.get(1)?.value
+        // Reject any callback whose state doesn't match the one we generated (CSRF / token injection).
+        if (token != null && TrackerOAuthState.consumeAndValidate(state)) {
             lifecycleScope.launchIO {
-                trackerManager.aniList.login(matchResult.groups[1]!!.value)
+                trackerManager.aniList.login(token)
                 returnToSettings()
             }
         } else {
@@ -32,7 +35,7 @@ class TrackLoginActivity : BaseOAuthLoginActivity() {
 
     private fun handleBangumi(data: Uri) {
         val code = data.getQueryParameter("code")
-        if (code != null) {
+        if (code != null && TrackerOAuthState.consumeAndValidate(data.getQueryParameter("state"))) {
             lifecycleScope.launchIO {
                 trackerManager.bangumi.login(code)
                 returnToSettings()
@@ -45,7 +48,7 @@ class TrackLoginActivity : BaseOAuthLoginActivity() {
 
     private fun handleMyAnimeList(data: Uri) {
         val code = data.getQueryParameter("code")
-        if (code != null) {
+        if (code != null && TrackerOAuthState.consumeAndValidate(data.getQueryParameter("state"))) {
             lifecycleScope.launchIO {
                 trackerManager.myAnimeList.login(code)
                 returnToSettings()
@@ -58,7 +61,7 @@ class TrackLoginActivity : BaseOAuthLoginActivity() {
 
     private fun handleShikimori(data: Uri) {
         val code = data.getQueryParameter("code")
-        if (code != null) {
+        if (code != null && TrackerOAuthState.consumeAndValidate(data.getQueryParameter("state"))) {
             lifecycleScope.launchIO {
                 trackerManager.shikimori.login(code)
                 returnToSettings()
@@ -71,7 +74,7 @@ class TrackLoginActivity : BaseOAuthLoginActivity() {
 
     private fun handleSimkl(data: Uri?) {
         val code = data?.getQueryParameter("code")
-        if (code != null) {
+        if (code != null && TrackerOAuthState.consumeAndValidate(data.getQueryParameter("state"))) {
             lifecycleScope.launchIO {
                 trackerManager.simkl.login(code)
                 returnToSettings()

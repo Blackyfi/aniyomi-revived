@@ -299,7 +299,6 @@ fun PlayerControls(
                     },
                 ) {
                     when (currentPlayerUpdate) {
-                        // is PlayerUpdates.DoubleSpeed -> DoubleSpeedPlayerUpdate()
                         is PlayerUpdates.AspectRatio -> TextPlayerUpdate(stringResource(aspectRatio.titleRes))
                         is PlayerUpdates.ShowText -> TextPlayerUpdate(
                             (currentPlayerUpdate as PlayerUpdates.ShowText).value,
@@ -307,7 +306,9 @@ fun PlayerControls(
                         is PlayerUpdates.ShowTextResource -> TextPlayerUpdate(
                             stringResource((currentPlayerUpdate as PlayerUpdates.ShowTextResource).textResource),
                         )
-                        else -> {}
+                        PlayerUpdates.DoubleSpeed,
+                        PlayerUpdates.None,
+                        -> {}
                     }
                 }
 

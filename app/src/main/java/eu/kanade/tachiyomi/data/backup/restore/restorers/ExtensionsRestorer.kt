@@ -13,9 +13,19 @@ class ExtensionsRestorer(
 
     fun restoreExtensions(extensions: List<BackupExtension>) {
         extensions.forEach {
+            // pkgName comes straight from the (untrusted) backup and is used as a filename
+            // below. Reject anything that isn't a valid Android package name to prevent path
+            // traversal / arbitrary file writes via crafted backups.
+            if (!it.pkgName.matches(PACKAGE_NAME_REGEX)) {
+                return@forEach
+            }
             if (context.packageManager.getInstalledPackages(0).none { pkg -> pkg.packageName == it.pkgName }) {
                 // save apk in files dir and open installer dialog
                 val file = File(context.cacheDir, "${it.pkgName}.apk")
+                // Defense in depth: ensure the resolved path stays within cacheDir.
+                if (!file.canonicalPath.startsWith(context.cacheDir.canonicalPath + File.separator)) {
+                    return@forEach
+                }
                 file.writeBytes(it.apk)
                 val intent = Intent(Intent.ACTION_VIEW)
                     .setDataAndType(
@@ -28,5 +38,10 @@ class ExtensionsRestorer(
                 context.startActivity(intent)
             }
         }
+    }
+
+    companion object {
+        // A valid Android package name: dot-separated identifiers, each starting with a letter.
+        private val PACKAGE_NAME_REGEX = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
     }
 }
