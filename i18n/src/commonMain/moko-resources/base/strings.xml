@@ -152,6 +152,8 @@
     <string name="action_share">Share</string>
     <string name="action_save">Save</string>
     <string name="action_reset">Reset</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_clear">Clear</string>
     <string name="action_revert_to_default">Revert to default</string>
     <!-- missing undo feature after Compose rewrite #7454 -->
     <string name="action_undo">Undo</string>
@@ -622,6 +624,9 @@
     <string name="pref_verbose_logging">Verbose logging</string>
     <string name="pref_verbose_logging_summary">Print verbose logs to system log (reduces app performance)</string>
     <string name="pref_debug_info">Debug info</string>
+    <string name="label_debug_logs">Debug logs</string>
+    <string name="pref_debug_logs_summary">View, copy and share logs captured while the app is running</string>
+    <string name="info_debug_logs_empty">No logs captured yet. Reproduce the issue, then come back to this screen and tap refresh.</string>
 
       <!-- About section -->
     <string name="website">Website</string>
