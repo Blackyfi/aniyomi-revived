@@ -115,6 +115,18 @@ class MangaScreen(
             }
         }
 
+        // Diagnostic for the multi-source picker render gate: the "Sources" card only
+        // shows when the source is a MultiSourceCatalogSource AND more than one source
+        // is available. Logging both inputs makes a missing card easy to triage.
+        LaunchedEffect(successState.availableSources.size, successState.source) {
+            val isMultiSource = successState.source is MultiSourceCatalogSource
+            logcat(LogPriority.INFO) {
+                "SourcePicker gate: source=${successState.source::class.java.simpleName}, " +
+                    "isMultiSource=$isMultiSource, availableSources=${successState.availableSources.size} " +
+                    "(card renders when isMultiSource && availableSources > 1)"
+            }
+        }
+
         MangaScreen(
             state = successState,
             snackbarHostState = screenModel.snackbarHostState,

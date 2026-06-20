@@ -33,6 +33,7 @@ import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.advanced.ClearAnimeDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.advanced.ClearDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugInfoScreen
+import eu.kanade.presentation.more.settings.screen.debug.DebugLogsScreen
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
@@ -120,6 +121,11 @@ object SettingsAdvancedScreen : SearchableSettings {
             Preference.PreferenceItem.TextPreference(
                 title = stringResource(MR.strings.pref_debug_info),
                 onClick = { navigator.push(DebugInfoScreen()) },
+            ),
+            Preference.PreferenceItem.TextPreference(
+                title = stringResource(MR.strings.label_debug_logs),
+                subtitle = stringResource(MR.strings.pref_debug_logs_summary),
+                onClick = { navigator.push(DebugLogsScreen()) },
             ),
             Preference.PreferenceItem.TextPreference(
                 title = stringResource(MR.strings.pref_onboarding_guide),
