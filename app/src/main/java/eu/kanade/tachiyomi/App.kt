@@ -61,7 +61,9 @@ import org.conscrypt.Conscrypt
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
+import tachiyomi.core.common.util.system.CompositeLogcatLogger
 import tachiyomi.core.common.util.system.ImageUtil
+import tachiyomi.core.common.util.system.InMemoryLogcatBuffer
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.widget.entries.anime.AnimeWidgetManager
@@ -157,8 +159,17 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             init(ProcessLifecycleOwner.get().lifecycleScope)
         }
 
-        if (!LogcatLogger.isInstalled && networkPreferences.verboseLogging().get()) {
-            LogcatLogger.install(AndroidLogcatLogger(LogPriority.VERBOSE))
+        // Always capture logs into the in-memory ring buffer (exposed via the in-app
+        // "Debug logs" screen) so errors are available even without verbose logging or
+        // `adb`. The Android logcat logger is only added when verbose logging is on.
+        if (!LogcatLogger.isInstalled) {
+            val loggers = buildList<LogcatLogger> {
+                add(InMemoryLogcatBuffer)
+                if (networkPreferences.verboseLogging().get()) {
+                    add(AndroidLogcatLogger(LogPriority.VERBOSE))
+                }
+            }
+            LogcatLogger.install(CompositeLogcatLogger(loggers))
         }
 
         initializeMigrator()
