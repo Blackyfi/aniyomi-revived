@@ -52,6 +52,7 @@ class SetupDefaultExtensionRepoMigration : Migration {
         const val REPO_NAME = "Aniyomi Revived Extensions"
         const val REPO_SHORT_NAME = "arext"
         const val REPO_WEBSITE = "https://github.com/Blackyfi/aniyomi-revived-extensions"
+
         // SHA-256 of the repo's APK signing cert; must match its published repo.json.
         const val REPO_FINGERPRINT =
             "e4bbc0829bf2b1ef674b4772407c93898253620c5bebca3b3ddb372b6863ca9b"
