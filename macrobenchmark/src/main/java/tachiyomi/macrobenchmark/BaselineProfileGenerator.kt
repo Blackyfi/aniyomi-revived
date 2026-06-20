@@ -12,7 +12,7 @@ class BaselineProfileGenerator {
 
     @Test
     fun generate() = baselineProfileRule.collect(
-        packageName = "xyz.jmir.tachiyomi.mi.benchmark",
+        packageName = "com.blackyfi.aniyomirevived.benchmark",
         profileBlock = {
             pressHome()
             startActivityAndWait()

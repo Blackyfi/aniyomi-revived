@@ -17,7 +17,7 @@ android {
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "xyz.jmir.tachiyomi.mi"
+        applicationId = "com.blackyfi.aniyomirevived"
 
         versionCode = 132
         versionName = "0.18.1.3"
