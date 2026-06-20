@@ -61,6 +61,7 @@ import eu.kanade.presentation.entries.manga.components.ExpandableMangaDescriptio
 import eu.kanade.presentation.entries.manga.components.MangaActionRow
 import eu.kanade.presentation.entries.manga.components.MangaChapterListItem
 import eu.kanade.presentation.entries.manga.components.MangaInfoBox
+import eu.kanade.presentation.entries.manga.components.MangaSourceSelector
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.source.ConfigurableSource
@@ -108,6 +109,9 @@ fun MangaScreen(
     onRefresh: () -> Unit,
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
+
+    // For the multi-source picker (no-op for ordinary sources)
+    onSourceSelected: ((String) -> Unit)?,
 
     // For cover dialog
     onCoverClicked: () -> Unit,
@@ -165,6 +169,7 @@ fun MangaScreen(
             onRefresh = onRefresh,
             onContinueReading = onContinueReading,
             onSearch = onSearch,
+            onSourceSelected = onSourceSelected,
             onCoverClicked = onCoverClicked,
             onShareClicked = onShareClicked,
             onDownloadActionClicked = onDownloadActionClicked,
@@ -201,6 +206,7 @@ fun MangaScreen(
             onRefresh = onRefresh,
             onContinueReading = onContinueReading,
             onSearch = onSearch,
+            onSourceSelected = onSourceSelected,
             onCoverClicked = onCoverClicked,
             onShareClicked = onShareClicked,
             onDownloadActionClicked = onDownloadActionClicked,
@@ -243,6 +249,7 @@ private fun MangaScreenSmallImpl(
     onRefresh: () -> Unit,
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
+    onSourceSelected: ((String) -> Unit)?,
 
     // For cover dialog
     onCoverClicked: () -> Unit,
@@ -436,6 +443,15 @@ private fun MangaScreenSmallImpl(
                         )
                     }
 
+                    if (onSourceSelected != null && state.availableSources.size > 1) {
+                        item(key = "source_selector") {
+                            MangaSourceSelector(
+                                sources = state.availableSources,
+                                onSourceSelected = onSourceSelected,
+                            )
+                        }
+                    }
+
                     item(
                         key = EntryScreenItem.ITEM_HEADER,
                         contentType = EntryScreenItem.ITEM_HEADER,
@@ -492,6 +508,7 @@ fun MangaScreenLargeImpl(
     onRefresh: () -> Unit,
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
+    onSourceSelected: ((String) -> Unit)?,
 
     // For cover dialog
     onCoverClicked: () -> Unit,
@@ -680,6 +697,15 @@ fun MangaScreenLargeImpl(
                                 bottom = contentPadding.calculateBottomPadding(),
                             ),
                         ) {
+                            if (onSourceSelected != null && state.availableSources.size > 1) {
+                                item(key = "source_selector") {
+                                    MangaSourceSelector(
+                                        sources = state.availableSources,
+                                        onSourceSelected = onSourceSelected,
+                                    )
+                                }
+                            }
+
                             item(
                                 key = EntryScreenItem.ITEM_HEADER,
                                 contentType = EntryScreenItem.ITEM_HEADER,

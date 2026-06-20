@@ -7,6 +7,7 @@ import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -81,6 +83,7 @@ import eu.kanade.presentation.components.DropdownMenu
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.source.MangaSourceInfo
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import tachiyomi.domain.entries.manga.model.Manga
@@ -155,6 +158,98 @@ fun MangaInfoBox(
                     doSearch = doSearch,
                 )
             }
+        }
+    }
+}
+
+/**
+ * A picker for switching between the alternate scraper sources a single manga is
+ * available from (only shown when [sources] has more than one entry). Selecting a
+ * source switches it server-side and re-pulls that source's chapters.
+ */
+@Composable
+fun MangaSourceSelector(
+    sources: List<MangaSourceInfo>,
+    onSourceSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val current = remember(sources) {
+        sources.firstOrNull { it.isEffective } ?: sources.firstOrNull()
+    } ?: return
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = MaterialTheme.padding.medium),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+                .padding(vertical = MaterialTheme.padding.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Public,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.size(MaterialTheme.padding.medium))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(MR.strings.label_sources),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.secondaryItemAlpha(),
+                )
+                Text(
+                    text = "${current.name}  •  ${current.totalChapters} ch",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(imageVector = Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            sources.forEach { source ->
+                val badges = remember(source) {
+                    buildList {
+                        add("${source.totalChapters} ch")
+                        if (source.isMostUpToDate) add("most up to date")
+                        if (source.isDefault) add("default")
+                    }.joinToString("  •  ")
+                }
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(text = source.name)
+                            Text(
+                                text = badges,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.secondaryItemAlpha(),
+                            )
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onSourceSelected(source.key)
+                    },
+                    leadingIcon = if (source.isEffective) {
+                        { Icon(imageVector = Icons.Outlined.Done, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(text = stringResource(MR.strings.label_source_auto)) },
+                onClick = {
+                    expanded = false
+                    onSourceSelected("auto")
+                },
+            )
         }
     }
 }
