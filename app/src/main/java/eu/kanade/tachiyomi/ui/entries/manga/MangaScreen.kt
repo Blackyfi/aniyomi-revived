@@ -41,6 +41,7 @@ import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.source.MangaSource
+import eu.kanade.tachiyomi.source.MultiSourceCatalogSource
 import eu.kanade.tachiyomi.source.manga.isLocalOrStub
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaDialog
@@ -154,6 +155,8 @@ class MangaScreen(
             onRefresh = screenModel::fetchAllFromSource,
             onContinueReading = { continueReading(context, screenModel.getNextUnreadChapter()) },
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
+            onSourceSelected = { key: String -> screenModel.switchSource(key) }
+                .takeIf { successState.source is MultiSourceCatalogSource },
             onCoverClicked = screenModel::showCoverDialog,
             onShareClicked = { shareManga(context, screenModel.manga, screenModel.source) }.takeIf { isHttpSource },
             onDownloadActionClicked = screenModel::runDownloadAction.takeIf { !successState.source.isLocalOrStub() },

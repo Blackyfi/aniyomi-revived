@@ -38,6 +38,8 @@ import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.MangaSource
+import eu.kanade.tachiyomi.source.MangaSourceInfo
+import eu.kanade.tachiyomi.source.MultiSourceCatalogSource
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
@@ -240,6 +242,9 @@ class MangaScreenModel(
 
             // Start observe tracking since it only needs mangaId
             observeTrackers()
+
+            // Load alternate sources for the picker (no-op for non-multi-source sources)
+            loadAvailableSources()
 
             // Fetch info-chapters when needed
             if (screenModelScope.isActive) {
@@ -598,6 +603,54 @@ class MangaScreenModel(
             updateSuccessState { it.copy(manga = newManga, isRefreshingData = false) }
         }
     }
+
+    // Multi-source picker - start
+
+    /**
+     * Loads the alternate sources for this manga, if the source supports them.
+     * No-op (and the picker stays hidden) for ordinary single sources.
+     */
+    private fun loadAvailableSources() {
+        val state = successState ?: return
+        val source = state.source as? MultiSourceCatalogSource ?: return
+        screenModelScope.launchIO {
+            try {
+                val sources = withIOContext { source.getMangaSources(state.manga.toSManga()) }
+                updateSuccessState { it.copy(availableSources = sources) }
+            } catch (e: Throwable) {
+                logcat(LogPriority.ERROR, e) { "Failed to load alternate sources" }
+            }
+        }
+    }
+
+    /**
+     * Switches the manga's active source on the server, then re-pulls its chapter
+     * list. Chapter URLs are keyed by chapter number (not source), so Aniyomi
+     * preserves read/bookmark state for shared chapter numbers across the switch.
+     *
+     * @param sourceKey a [MangaSourceInfo.key], or "auto".
+     */
+    fun switchSource(sourceKey: String) {
+        val state = successState ?: return
+        val source = state.source as? MultiSourceCatalogSource ?: return
+        screenModelScope.launchIO {
+            updateSuccessState { it.copy(isRefreshingData = true) }
+            try {
+                val sources = withIOContext { source.setMangaSource(state.manga.toSManga(), sourceKey) }
+                updateSuccessState { it.copy(availableSources = sources) }
+                fetchChaptersFromSource(manualFetch = false)
+            } catch (e: Throwable) {
+                logcat(LogPriority.ERROR, e) { "Failed to switch source" }
+                screenModelScope.launch {
+                    snackbarHostState.showSnackbar(message = with(context) { e.formattedMessage })
+                }
+            } finally {
+                updateSuccessState { it.copy(isRefreshingData = false) }
+            }
+        }
+    }
+
+    // Multi-source picker - end
 
     /**
      * @throws IllegalStateException if the swipe action is [LibraryPreferences.ChapterSwipeAction.Disabled]
@@ -1148,6 +1201,9 @@ class MangaScreenModel(
             val chapters: List<ChapterList.Item>,
             val availableScanlators: Set<String>,
             val excludedScanlators: Set<String>,
+            // Alternate scraper sources for this manga (only for MultiSourceCatalogSource);
+            // empty for ordinary sources, which hides the picker.
+            val availableSources: List<MangaSourceInfo> = emptyList(),
             val trackingCount: Int = 0,
             val hasLoggedInTrackers: Boolean = false,
             val isRefreshingData: Boolean = false,
