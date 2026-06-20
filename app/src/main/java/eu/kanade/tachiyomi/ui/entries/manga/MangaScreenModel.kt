@@ -611,14 +611,34 @@ class MangaScreenModel(
      * No-op (and the picker stays hidden) for ordinary single sources.
      */
     private fun loadAvailableSources() {
-        val state = successState ?: return
-        val source = state.source as? MultiSourceCatalogSource ?: return
+        val state = successState
+        if (state == null) {
+            logcat(LogPriority.INFO) { "SourcePicker: loadAvailableSources skipped — no success state yet" }
+            return
+        }
+        val source = state.source
+        if (source !is MultiSourceCatalogSource) {
+            logcat(LogPriority.INFO) {
+                "SourcePicker: source is NOT a MultiSourceCatalogSource " +
+                    "(id=${source.id}, name=${source.name}, class=${source::class.java.name}) — " +
+                    "picker stays hidden"
+            }
+            return
+        }
+        logcat(LogPriority.INFO) {
+            "SourcePicker: loading alternate sources for mangaId=$mangaId via ${source::class.java.name}"
+        }
         screenModelScope.launchIO {
             try {
                 val sources = withIOContext { source.getMangaSources(state.manga.toSManga()) }
+                logcat(LogPriority.INFO) {
+                    "SourcePicker: getMangaSources returned ${sources.size} source(s): " +
+                        sources.joinToString { "${it.name}(${it.key})" } +
+                        " — card shows when size > 1"
+                }
                 updateSuccessState { it.copy(availableSources = sources) }
             } catch (e: Throwable) {
-                logcat(LogPriority.ERROR, e) { "Failed to load alternate sources" }
+                logcat(LogPriority.ERROR, e) { "SourcePicker: Failed to load alternate sources" }
             }
         }
     }
@@ -633,14 +653,18 @@ class MangaScreenModel(
     fun switchSource(sourceKey: String) {
         val state = successState ?: return
         val source = state.source as? MultiSourceCatalogSource ?: return
+        logcat(LogPriority.INFO) { "SourcePicker: switching to source key='$sourceKey' for mangaId=$mangaId" }
         screenModelScope.launchIO {
             updateSuccessState { it.copy(isRefreshingData = true) }
             try {
                 val sources = withIOContext { source.setMangaSource(state.manga.toSManga(), sourceKey) }
+                logcat(LogPriority.INFO) {
+                    "SourcePicker: setMangaSource ok — now ${sources.size} source(s), refreshing chapters"
+                }
                 updateSuccessState { it.copy(availableSources = sources) }
                 fetchChaptersFromSource(manualFetch = false)
             } catch (e: Throwable) {
-                logcat(LogPriority.ERROR, e) { "Failed to switch source" }
+                logcat(LogPriority.ERROR, e) { "SourcePicker: Failed to switch source" }
                 screenModelScope.launch {
                     snackbarHostState.showSnackbar(message = with(context) { e.formattedMessage })
                 }
