@@ -4,11 +4,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.presentation.util.Tab
 import kotlinx.coroutines.channels.Channel
-import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -36,9 +36,11 @@ data object ManhwaLibraryTab : Tab {
 
     @Composable
     override fun Content() {
+        val screenModel = rememberScreenModel { ManhwaLibraryScreenModel() }
+        val settingsScreenModel = rememberScreenModel { MangaLibrarySettingsScreenModel() }
         MangaLibraryTabContent(
-            libraryType = MangaType.MANHWA,
-            screenModelTag = "manhwa-library",
+            screenModel = screenModel,
+            settingsScreenModel = settingsScreenModel,
             defaultTitle = stringResource(AYMR.strings.label_manhwa_library),
             fromMore = false,
             queryEvent = queryEvent,
