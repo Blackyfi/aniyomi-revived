@@ -129,6 +129,8 @@ class MangaRestorer(
                 updateStrategy = manga.updateStrategy.let(MangaUpdateStrategyColumnAdapter::encode),
                 version = manga.version,
                 isSyncing = 1,
+                // Not stored in backups; keep the existing/auto-detected value.
+                mangaType = null,
             )
         }
         return manga
