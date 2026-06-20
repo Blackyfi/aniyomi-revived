@@ -1,0 +1,3 @@
+-- Add manga_type to classify entries as manga (0/UNKNOWN, 1/MANGA) or manhwa (2/MANHWA).
+-- Existing entries default to 0 (UNKNOWN) and are auto-detected on their next refresh.
+ALTER TABLE mangas ADD COLUMN manga_type INTEGER NOT NULL DEFAULT 0;

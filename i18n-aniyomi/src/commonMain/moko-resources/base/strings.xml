@@ -378,7 +378,13 @@
     <string name="episodes">Episodes</string>
     <string name="backup_settings_warning">Warning: Backing up settings will store your track passwords as well, do not share this backup file!</string>
     <string name="label_manga_library">Manga</string>
+    <string name="label_manhwa_library">Manhwa</string>
     <string name="label_anime_library">Anime</string>
+    <!-- Manga/Manhwa classification -->
+    <string name="action_set_manga_type">Set type</string>
+    <string name="manga_type_automatic">Automatic</string>
+    <string name="manga_type_manga">Manga</string>
+    <string name="manga_type_manhwa">Manhwa</string>
     <string name="label_anime">Anime</string>
     <string name="label_manga">Manga</string>
     <string name="label_recent_anime_updates">Anime Updates</string>

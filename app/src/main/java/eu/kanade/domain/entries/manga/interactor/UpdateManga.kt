@@ -5,8 +5,11 @@ import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.source.model.SManga
 import tachiyomi.domain.entries.manga.interactor.MangaFetchInterval
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
+import tachiyomi.domain.entries.manga.model.MangaTypeDetector
 import tachiyomi.domain.entries.manga.model.MangaUpdate
 import tachiyomi.domain.entries.manga.repository.MangaRepository
+import tachiyomi.domain.source.manga.service.MangaSourceManager
 import tachiyomi.source.local.entries.manga.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -16,6 +19,7 @@ import java.time.ZonedDateTime
 class UpdateManga(
     private val mangaRepository: MangaRepository,
     private val mangaFetchInterval: MangaFetchInterval,
+    private val sourceManager: MangaSourceManager = Injekt.get(),
 ) {
 
     suspend fun await(mangaUpdate: MangaUpdate): Boolean {
@@ -59,6 +63,19 @@ class UpdateManga(
 
         val thumbnailUrl = remoteManga.thumbnail_url?.takeIf { it.isNotEmpty() }
 
+        val remoteGenres = remoteManga.getGenres()
+
+        // Auto-classify as manga/manhwa, but only while the type has never been set so a manual
+        // choice (or a previous detection) is never overwritten by a later refresh.
+        val mangaType = if (localManga.mangaType == MangaType.UNKNOWN) {
+            MangaTypeDetector.detect(
+                genres = remoteGenres,
+                sourceLang = sourceManager.get(localManga.source)?.lang,
+            )
+        } else {
+            null
+        }
+
         return mangaRepository.updateManga(
             MangaUpdate(
                 id = localManga.id,
@@ -67,11 +84,12 @@ class UpdateManga(
                 author = remoteManga.author,
                 artist = remoteManga.artist,
                 description = remoteManga.description,
-                genre = remoteManga.getGenres(),
+                genre = remoteGenres,
                 thumbnailUrl = thumbnailUrl,
                 status = remoteManga.status.toLong(),
                 updateStrategy = remoteManga.update_strategy,
                 initialized = true,
+                mangaType = mangaType,
             ),
         )
     }

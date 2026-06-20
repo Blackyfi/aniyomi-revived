@@ -75,6 +75,8 @@ import tachiyomi.domain.entries.manga.interactor.GetDuplicateLibraryManga
 import tachiyomi.domain.entries.manga.interactor.GetMangaWithChapters
 import tachiyomi.domain.entries.manga.interactor.SetMangaChapterFlags
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
+import tachiyomi.domain.entries.manga.model.MangaUpdate
 import tachiyomi.domain.entries.manga.repository.MangaRepository
 import tachiyomi.domain.items.chapter.interactor.SetMangaDefaultChapterFlags
 import tachiyomi.domain.items.chapter.interactor.UpdateChapter
@@ -415,6 +417,22 @@ class MangaScreenModel(
                     manga.copy(fetchInterval = -interval),
                 )
             ) {
+                val updatedManga = mangaRepository.getMangaById(manga.id)
+                updateSuccessState { it.copy(manga = updatedManga) }
+            }
+        }
+    }
+
+    fun showSetMangaTypeDialog() {
+        val manga = successState?.manga ?: return
+        updateSuccessState {
+            it.copy(dialog = Dialog.SetMangaType(manga))
+        }
+    }
+
+    fun setMangaType(manga: Manga, type: MangaType) {
+        screenModelScope.launchIO {
+            if (updateManga.await(MangaUpdate(id = manga.id, mangaType = type))) {
                 val updatedManga = mangaRepository.getMangaById(manga.id)
                 updateSuccessState { it.copy(manga = updatedManga) }
             }
@@ -1177,6 +1195,7 @@ class MangaScreenModel(
         data class DuplicateManga(val manga: Manga, val duplicate: Manga) : Dialog
         data class Migrate(val newManga: Manga, val oldManga: Manga) : Dialog
         data class SetMangaFetchInterval(val manga: Manga) : Dialog
+        data class SetMangaType(val manga: Manga) : Dialog
         data object SettingsSheet : Dialog
         data object TrackSheet : Dialog
         data object FullCover : Dialog

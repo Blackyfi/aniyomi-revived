@@ -57,6 +57,7 @@ import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.applyFilter
 import tachiyomi.domain.entries.manga.interactor.GetLibraryManga
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.entries.manga.model.MangaUpdate
 import tachiyomi.domain.history.manga.interactor.GetNextChapters
 import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
@@ -95,6 +96,7 @@ class MangaLibraryScreenModel(
     private val downloadManager: MangaDownloadManager = Injekt.get(),
     private val downloadCache: MangaDownloadCache = Injekt.get(),
     private val trackerManager: TrackerManager = Injekt.get(),
+    private val libraryType: MangaType = MangaType.MANGA,
 ) : StateScreenModel<MangaLibraryScreenModel.State>(State()) {
 
     var activeCategoryIndex: Int by libraryPreferences.lastUsedMangaCategory().asState(
@@ -236,8 +238,19 @@ class MangaLibraryScreenModel(
             !isExcluded && isIncluded
         }
 
+        // Split entries between the Manga and Manhwa tabs. Unknown/unclassified entries are
+        // treated as manga so nothing disappears from the library before it has been detected.
+        val filterFnType: (MangaLibraryItem) -> Boolean = {
+            val type = it.libraryManga.manga.mangaType
+            when (libraryType) {
+                MangaType.MANHWA -> type == MangaType.MANHWA
+                else -> type != MangaType.MANHWA
+            }
+        }
+
         val filterFn: (MangaLibraryItem) -> Boolean = {
-            filterFnDownloaded(it) &&
+            filterFnType(it) &&
+                filterFnDownloaded(it) &&
                 filterFnUnread(it) &&
                 filterFnStarted(it) &&
                 filterFnBookmarked(it) &&
