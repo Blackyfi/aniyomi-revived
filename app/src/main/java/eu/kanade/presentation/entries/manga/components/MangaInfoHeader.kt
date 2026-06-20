@@ -7,7 +7,6 @@ import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +47,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
@@ -98,6 +98,7 @@ import tachiyomi.presentation.core.util.secondaryItemAlpha
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
+import androidx.compose.material3.DropdownMenu as M3DropdownMenu
 
 private val whitespaceLineRegex = Regex("[\\r\\n]{2,}", setOf(RegexOption.MULTILINE))
 
@@ -178,78 +179,87 @@ fun MangaSourceSelector(
     } ?: return
     var expanded by remember { mutableStateOf(false) }
 
-    Box(
+    OutlinedCard(
+        onClick = { expanded = true },
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.padding.medium),
+            .padding(
+                horizontal = MaterialTheme.padding.medium,
+                vertical = MaterialTheme.padding.small,
+            ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = true }
-                .padding(vertical = MaterialTheme.padding.small),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Public,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.size(MaterialTheme.padding.medium))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(MR.strings.label_sources),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.secondaryItemAlpha(),
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = MaterialTheme.padding.medium,
+                        vertical = MaterialTheme.padding.small,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Public,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
                 )
-                Text(
-                    text = "${current.name}  •  ${current.totalChapters} ch",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Spacer(modifier = Modifier.size(MaterialTheme.padding.medium))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(MR.strings.label_sources),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "${current.name}  •  ${current.totalChapters} ch",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(imageVector = Icons.Filled.ArrowDropDown, contentDescription = null)
             }
-            Icon(imageVector = Icons.Filled.ArrowDropDown, contentDescription = null)
-        }
 
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            sources.forEach { source ->
-                val badges = remember(source) {
-                    buildList {
-                        add("${source.totalChapters} ch")
-                        if (source.isMostUpToDate) add("most up to date")
-                        if (source.isDefault) add("default")
-                    }.joinToString("  •  ")
+            // Anchored to the card so the menu drops directly below the row.
+            M3DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                sources.forEach { source ->
+                    val badges = remember(source) {
+                        buildList {
+                            add("${source.totalChapters} ch")
+                            if (source.isMostUpToDate) add("most up to date")
+                            if (source.isDefault) add("default")
+                        }.joinToString("  •  ")
+                    }
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(text = source.name)
+                                Text(
+                                    text = badges,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.secondaryItemAlpha(),
+                                )
+                            }
+                        },
+                        onClick = {
+                            expanded = false
+                            onSourceSelected(source.key)
+                        },
+                        leadingIcon = if (source.isEffective) {
+                            { Icon(imageVector = Icons.Outlined.Done, contentDescription = null) }
+                        } else {
+                            null
+                        },
+                    )
                 }
                 DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(text = source.name)
-                            Text(
-                                text = badges,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.secondaryItemAlpha(),
-                            )
-                        }
-                    },
+                    text = { Text(text = stringResource(MR.strings.label_source_auto)) },
                     onClick = {
                         expanded = false
-                        onSourceSelected(source.key)
-                    },
-                    leadingIcon = if (source.isEffective) {
-                        { Icon(imageVector = Icons.Outlined.Done, contentDescription = null) }
-                    } else {
-                        null
+                        onSourceSelected("auto")
                     },
                 )
             }
-            DropdownMenuItem(
-                text = { Text(text = stringResource(MR.strings.label_source_auto)) },
-                onClick = {
-                    expanded = false
-                    onSourceSelected("auto")
-                },
-            )
         }
     }
 }
