@@ -253,11 +253,8 @@ private fun AnimeExtensionContent(
     }
     if (trustState != null) {
         ExtensionTrustDialog(
-            onClickConfirm = {
-                onTrustExtension(trustState!!)
-                trustState = null
-            },
-            onClickDismiss = {
+            // Deny-by-default: an untrusted extension can only be uninstalled, never manually trusted.
+            onClickUninstall = {
                 onUninstallExtension(trustState!!)
                 trustState = null
             },
