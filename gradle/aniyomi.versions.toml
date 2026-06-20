@@ -8,7 +8,7 @@ seeker = "1.2.2"
 truetypeparser = "2.1.4"
 
 [libraries]
-aniyomi-mpv = { module = "com.github.aniyomiorg:aniyomi-mpv-lib", version.ref = "aniyomi-mpv-lib" }
+aniyomi-mpv = { module = "com.github.Blackyfi:aniyomi-mpv-lib-revived", version.ref = "aniyomi-mpv-lib" }
 arthenica-smartexceptions = { module = "com.arthenica:smart-exception-java", version.ref = "arthenica-smartexceptions" }
 compose-constraintlayout = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraint-layout" }
 ffmpeg-kit = { module = "com.github.jmir1:ffmpeg-kit", version.ref = "ffmpeg-kit" }
