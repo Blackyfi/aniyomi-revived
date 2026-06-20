@@ -55,7 +55,6 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.manga.model.Manga
-import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -91,9 +90,11 @@ data object MangaLibraryTab : Tab {
     @Composable
     override fun Content() {
         val fromMore = currentNavigationStyle() == NavStyle.MOVE_MANGA_TO_MORE
+        val screenModel = rememberScreenModel { MangaLibraryScreenModel() }
+        val settingsScreenModel = rememberScreenModel { MangaLibrarySettingsScreenModel() }
         MangaLibraryTabContent(
-            libraryType = MangaType.MANGA,
-            screenModelTag = null,
+            screenModel = screenModel,
+            settingsScreenModel = settingsScreenModel,
             defaultTitle = stringResource(AYMR.strings.label_manga_library),
             fromMore = fromMore,
             queryEvent = queryEvent,
@@ -111,15 +112,16 @@ data object MangaLibraryTab : Tab {
 }
 
 /**
- * Shared library screen used by both [MangaLibraryTab] and [ManhwaLibraryTab]. The only difference
- * between the two is [libraryType], which the screen model uses to split entries between the manga
- * and manhwa tabs.
+ * Shared library screen used by both [MangaLibraryTab] and [ManhwaLibraryTab]. Each tab passes its
+ * own [screenModel] (a distinct [MangaLibraryScreenModel] subtype) so the two tabs get separate
+ * instances; the screen model's library type is what splits entries between the manga and manhwa
+ * tabs.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MangaLibraryTabContent(
-    libraryType: MangaType,
-    screenModelTag: String?,
+    screenModel: MangaLibraryScreenModel,
+    settingsScreenModel: MangaLibrarySettingsScreenModel,
     defaultTitle: String,
     fromMore: Boolean,
     queryEvent: Channel<String>,
@@ -130,12 +132,6 @@ internal fun MangaLibraryTabContent(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
-    val screenModel = rememberScreenModel(tag = screenModelTag) {
-        MangaLibraryScreenModel(libraryType = libraryType)
-    }
-    val settingsScreenModel = rememberScreenModel(tag = screenModelTag) {
-        MangaLibrarySettingsScreenModel()
-    }
     val state by screenModel.state.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }

@@ -80,7 +80,7 @@ import kotlin.random.Random
  */
 typealias MangaLibraryMap = Map<Category, List<MangaLibraryItem>>
 
-class MangaLibraryScreenModel(
+open class MangaLibraryScreenModel(
     private val getLibraryManga: GetLibraryManga = Injekt.get(),
     private val getCategories: GetVisibleMangaCategories = Injekt.get(),
     private val getTracksPerManga: GetTracksPerManga = Injekt.get(),
