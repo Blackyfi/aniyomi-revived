@@ -7,6 +7,7 @@ val migrations: List<Migration>
         SetupBackupCreateMigration(),
         SetupAnimeLibraryUpdateMigration(),
         SetupMangaLibraryUpdateMigration(),
+        SetupDefaultExtensionRepoMigration(),
         InternalChapterCacheDirMigration(),
         CoverToExternalFileMigration(),
         DeleteExternalChapterCacheDirMigration(),
