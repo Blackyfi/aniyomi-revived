@@ -37,6 +37,7 @@ import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
 import eu.kanade.presentation.entries.manga.MangaScreen
 import eu.kanade.presentation.entries.manga.components.MangaCoverDialog
 import eu.kanade.presentation.entries.manga.components.ScanlatorFilterDialog
+import eu.kanade.presentation.entries.manga.components.SetMangaTypeDialog
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
@@ -176,6 +177,9 @@ class MangaScreen(
             onEditFetchIntervalClicked = screenModel::showSetMangaFetchIntervalDialog.takeIf {
                 successState.manga.favorite
             },
+            onEditTypeClicked = screenModel::showSetMangaTypeDialog.takeIf {
+                successState.manga.favorite
+            },
             onMigrateClicked = {
                 navigator.push(MigrateMangaSearchScreen(successState.manga.id))
             }.takeIf { successState.manga.favorite },
@@ -305,6 +309,13 @@ class MangaScreen(
                     isManga = true,
                     onValueChanged = { interval: Int -> screenModel.setFetchInterval(dialog.manga, interval) }
                         .takeIf { screenModel.isUpdateIntervalEnabled },
+                )
+            }
+            is MangaScreenModel.Dialog.SetMangaType -> {
+                SetMangaTypeDialog(
+                    currentType = dialog.manga.mangaType,
+                    onDismissRequest = onDismissRequest,
+                    onValueChanged = { type -> screenModel.setMangaType(dialog.manga, type) },
                 )
             }
         }

@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.ui.browse.BrowseTab
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
+import eu.kanade.tachiyomi.ui.library.manga.ManhwaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import tachiyomi.i18n.aniyomi.AYMR
@@ -42,6 +43,7 @@ enum class NavStyle(
             return mutableListOf(
                 AnimeLibraryTab,
                 MangaLibraryTab,
+                ManhwaLibraryTab,
                 UpdatesTab,
                 HistoriesTab,
                 BrowseTab,

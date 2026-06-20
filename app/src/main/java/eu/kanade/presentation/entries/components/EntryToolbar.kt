@@ -39,6 +39,8 @@ fun EntryToolbar(
     onClickRefresh: () -> Unit,
     onClickMigrate: (() -> Unit)?,
     onClickSettings: (() -> Unit)?,
+    // Manga only
+    onClickEditType: (() -> Unit)? = null,
     // Anime only
     changeAnimeSkipIntro: (() -> Unit)?,
     // For action mode
@@ -134,6 +136,14 @@ fun EntryToolbar(
                             AppBar.OverflowAction(
                                 title = stringResource(MR.strings.action_edit_categories),
                                 onClick = onClickEditCategory,
+                            ),
+                        )
+                    }
+                    if (onClickEditType != null) {
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(AYMR.strings.action_set_manga_type),
+                                onClick = onClickEditType,
                             ),
                         )
                     }
