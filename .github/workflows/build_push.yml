@@ -123,7 +123,8 @@ jobs:
             aniyomi-armeabi-v7a-${{ env.VERSION_TAG }}.apk
             aniyomi-x86-${{ env.VERSION_TAG }}.apk
             aniyomi-x86_64-${{ env.VERSION_TAG }}.apk
-          draft: true
+          draft: false
+          make_latest: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
