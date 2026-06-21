@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.GlobalSearchItem
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
@@ -33,7 +34,7 @@ fun AnimeLibraryPager(
     state: PagerState,
     contentPadding: PaddingValues,
     hasActiveFilters: Boolean,
-    selectedAnime: List<LibraryAnime>,
+    selectedIds: ImmutableSet<Long>,
     searchQuery: String?,
     onGlobalSearchClicked: () -> Unit,
     getDisplayMode: (Int) -> PreferenceMutableState<LibraryDisplayMode>,
@@ -80,7 +81,7 @@ fun AnimeLibraryPager(
                         entries = columns,
                         containerHeight = containerHeightPx,
                         contentPadding = contentPadding,
-                        selection = selectedAnime,
+                        selectedIds = selectedIds,
                         onClick = onClickAnime,
                         onClickContinueWatching = onClickContinueWatching,
                         onLongClick = onLongClickAnime,
@@ -95,7 +96,7 @@ fun AnimeLibraryPager(
                         showTitle = displayMode is LibraryDisplayMode.CompactGrid,
                         columns = columns,
                         contentPadding = contentPadding,
-                        selection = selectedAnime,
+                        selectedIds = selectedIds,
                         onClick = onClickAnime,
                         onClickContinueWatching = onClickContinueWatching,
                         onLongClick = onLongClickAnime,
@@ -109,7 +110,7 @@ fun AnimeLibraryPager(
                         items = library,
                         columns = columns,
                         contentPadding = contentPadding,
-                        selection = selectedAnime,
+                        selectedIds = selectedIds,
                         onClick = onClickAnime,
                         onLongClick = onLongClickAnime,
                         onClickContinueWatching = onClickContinueWatching,
