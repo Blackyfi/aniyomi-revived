@@ -28,6 +28,13 @@ sealed class Filter<T>(val name: String, var state: T) {
         data class Selection(val index: Int, val ascending: Boolean)
     }
 
+    abstract class AutoComplete(
+        name: String,
+        val hint: String = "",
+        state: String = "",
+        val suggestions: List<String> = emptyList(),
+    ) : Filter<String>(name, state)
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Filter<*>) return false
