@@ -7,13 +7,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastAny
 import eu.kanade.presentation.library.components.DownloadsBadge
 import eu.kanade.presentation.library.components.EntryListItem
 import eu.kanade.presentation.library.components.GlobalSearchItem
 import eu.kanade.presentation.library.components.LanguageBadge
 import eu.kanade.presentation.library.components.UnviewedBadge
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
@@ -25,7 +25,7 @@ internal fun AnimeLibraryList(
     entries: Int,
     containerHeight: Int,
     contentPadding: PaddingValues,
-    selection: List<LibraryAnime>,
+    selectedIds: ImmutableSet<Long>,
     onClick: (LibraryAnime) -> Unit,
     onLongClick: (LibraryAnime) -> Unit,
     onClickContinueWatching: ((LibraryAnime) -> Unit)?,
@@ -48,11 +48,12 @@ internal fun AnimeLibraryList(
 
         items(
             items = items,
+            key = { it.libraryAnime.id },
             contentType = { "anime_library_list_item" },
         ) { libraryItem ->
             val anime = libraryItem.libraryAnime.anime
             EntryListItem(
-                isSelected = selection.fastAny { it.id == libraryItem.libraryAnime.id },
+                isSelected = selectedIds.contains(libraryItem.libraryAnime.id),
                 title = anime.title,
                 coverData = AnimeCover(
                     animeId = anime.id,

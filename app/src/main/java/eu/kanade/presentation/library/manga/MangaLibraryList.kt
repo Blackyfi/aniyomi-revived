@@ -7,13 +7,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastAny
 import eu.kanade.presentation.library.components.DownloadsBadge
 import eu.kanade.presentation.library.components.EntryListItem
 import eu.kanade.presentation.library.components.GlobalSearchItem
 import eu.kanade.presentation.library.components.LanguageBadge
 import eu.kanade.presentation.library.components.UnviewedBadge
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
 import tachiyomi.domain.entries.manga.model.MangaCover
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
@@ -25,7 +25,7 @@ internal fun MangaLibraryList(
     entries: Int,
     containerHeight: Int,
     contentPadding: PaddingValues,
-    selection: List<LibraryManga>,
+    selectedIds: ImmutableSet<Long>,
     onClick: (LibraryManga) -> Unit,
     onLongClick: (LibraryManga) -> Unit,
     onClickContinueReading: ((LibraryManga) -> Unit)?,
@@ -48,11 +48,12 @@ internal fun MangaLibraryList(
 
         items(
             items = items,
+            key = { it.libraryManga.id },
             contentType = { "manga_library_list_item" },
         ) { libraryItem ->
             val manga = libraryItem.libraryManga.manga
             EntryListItem(
-                isSelected = selection.fastAny { it.id == libraryItem.libraryManga.id },
+                isSelected = selectedIds.contains(libraryItem.libraryManga.id),
                 title = manga.title,
                 coverData = MangaCover(
                     mangaId = manga.id,
