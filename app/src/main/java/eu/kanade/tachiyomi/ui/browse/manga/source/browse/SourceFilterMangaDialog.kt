@@ -20,6 +20,7 @@ import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.components.AutoCompleteItem
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.CollapsibleBox
 import tachiyomi.presentation.core.components.HeadingItem
@@ -107,6 +108,17 @@ private fun FilterItem(filter: Filter<*>, onUpdate: () -> Unit) {
             TextItem(
                 label = filter.name,
                 value = filter.state,
+            ) {
+                filter.state = it
+                onUpdate()
+            }
+        }
+        is Filter.AutoComplete -> {
+            AutoCompleteItem(
+                label = filter.name,
+                hint = filter.hint,
+                value = filter.state,
+                suggestions = filter.suggestions,
             ) {
                 filter.state = it
                 onUpdate()
