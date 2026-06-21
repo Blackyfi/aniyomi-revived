@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Input
 import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.RemoveDone
+import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -298,6 +299,7 @@ fun LibraryBottomActionMenu(
     onDeleteClicked: () -> Unit,
     isManga: Boolean,
     modifier: Modifier = Modifier,
+    onSetTypeClicked: (() -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -314,11 +316,11 @@ fun LibraryBottomActionMenu(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             val haptic = LocalHapticFeedback.current
-            val confirm = remember { mutableStateListOf(false, false, false, false, false) }
+            val confirm = remember { mutableStateListOf(false, false, false, false, false, false) }
             var resetJob: Job? = remember { null }
             val onLongClickItem: (Int) -> Unit = { toConfirmIndex ->
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                (0..<5).forEach { i -> confirm[i] = i == toConfirmIndex }
+                (0..<6).forEach { i -> confirm[i] = i == toConfirmIndex }
                 resetJob?.cancel()
                 resetJob = scope.launch {
                     delay(1.seconds)
@@ -373,6 +375,15 @@ fun LibraryBottomActionMenu(
                             isManga = isManga,
                         )
                     }
+                }
+                if (onSetTypeClicked != null) {
+                    Button(
+                        title = stringResource(AYMR.strings.action_set_manga_type),
+                        icon = Icons.Outlined.Style,
+                        toConfirm = confirm[5],
+                        onLongClick = { onLongClickItem(5) },
+                        onClick = onSetTypeClicked,
+                    )
                 }
                 Button(
                     title = stringResource(MR.strings.action_delete),
