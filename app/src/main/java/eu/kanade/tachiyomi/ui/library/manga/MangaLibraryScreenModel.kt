@@ -106,7 +106,7 @@ open class MangaLibraryScreenModel(
     init {
         screenModelScope.launchIO {
             combine(
-                state.map { it.searchQuery }.debounce(SEARCH_DEBOUNCE_MILLIS),
+                state.map { it.searchQuery }.distinctUntilChanged().debounce(SEARCH_DEBOUNCE_MILLIS),
                 getLibraryFlow(),
                 getTracksPerManga.subscribe(),
                 getTrackingFilterFlow(),
@@ -434,15 +434,13 @@ open class MangaLibraryScreenModel(
     }
 
     /**
-     * Returns the common categories for the given list of manga.
+     * Returns the common categories for the given precomputed per-manga category sets.
      *
-     * @param mangas the list of manga.
+     * @param categorySets the per-manga category sets.
      */
-    private suspend fun getCommonCategories(mangas: List<Manga>): Collection<Category> {
-        if (mangas.isEmpty()) return emptyList()
-        return mangas
-            .map { getCategories.await(it.id).toSet() }
-            .reduce { set1, set2 -> set1.intersect(set2) }
+    private fun getCommonCategories(categorySets: List<Set<Category>>): Collection<Category> {
+        if (categorySets.isEmpty()) return emptyList()
+        return categorySets.reduce { set1, set2 -> set1.intersect(set2) }
     }
 
     suspend fun getNextUnreadChapter(manga: Manga): Chapter? {
@@ -450,15 +448,14 @@ open class MangaLibraryScreenModel(
     }
 
     /**
-     * Returns the mix (non-common) categories for the given list of manga.
+     * Returns the mix (non-common) categories for the given precomputed per-manga category sets.
      *
-     * @param mangas the list of manga.
+     * @param categorySets the per-manga category sets.
      */
-    private suspend fun getMixCategories(mangas: List<Manga>): Collection<Category> {
-        if (mangas.isEmpty()) return emptyList()
-        val mangaCategories = mangas.map { getCategories.await(it.id).toSet() }
-        val common = mangaCategories.reduce { set1, set2 -> set1.intersect(set2) }
-        return mangaCategories.flatten().distinct().subtract(common)
+    private fun getMixCategories(categorySets: List<Set<Category>>): Collection<Category> {
+        if (categorySets.isEmpty()) return emptyList()
+        val common = categorySets.reduce { set1, set2 -> set1.intersect(set2) }
+        return categorySets.flatten().distinct().subtract(common)
     }
 
     fun runDownloadActionSelection(action: DownloadAction) {
@@ -697,10 +694,12 @@ open class MangaLibraryScreenModel(
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
 
+            // Fetch each selected manga's category set once, then derive both sets in memory.
+            val categorySets = mangaList.map { getCategories.await(it.id).toSet() }
             // Get indexes of the common categories to preselect.
-            val common = getCommonCategories(mangaList)
+            val common = getCommonCategories(categorySets)
             // Get indexes of the mix categories to preselect.
-            val mix = getMixCategories(mangaList)
+            val mix = getMixCategories(categorySets)
             val preselected = categories
                 .map {
                     when (it) {
