@@ -61,6 +61,7 @@ import org.conscrypt.Conscrypt
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
+import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.system.CompositeLogcatLogger
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.InMemoryLogcatBuffer
@@ -105,7 +106,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         Injekt.importModule(SYDomainModule())
         // SY <--
 
-        setupNotificationChannels()
+        ProcessLifecycleOwner.get().lifecycleScope.launchIO { setupNotificationChannels() }
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
