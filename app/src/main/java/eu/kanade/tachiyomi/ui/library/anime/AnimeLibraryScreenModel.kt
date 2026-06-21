@@ -107,7 +107,7 @@ class AnimeLibraryScreenModel(
     init {
         screenModelScope.launchIO {
             combine(
-                state.map { it.searchQuery }.debounce(SEARCH_DEBOUNCE_MILLIS),
+                state.map { it.searchQuery }.distinctUntilChanged().debounce(SEARCH_DEBOUNCE_MILLIS),
                 getLibraryFlow(),
                 getTracksPerAnime.subscribe(),
                 getTrackingFilterFlow(),
@@ -435,15 +435,13 @@ class AnimeLibraryScreenModel(
     }
 
     /**
-     * Returns the common categories for the given list of anime.
+     * Returns the common categories for the given precomputed per-anime category sets.
      *
-     * @param animes the list of anime.
+     * @param categorySets the per-anime category sets.
      */
-    private suspend fun getCommonCategories(animes: List<Anime>): Collection<Category> {
-        if (animes.isEmpty()) return emptyList()
-        return animes
-            .map { getCategories.await(it.id).toSet() }
-            .reduce { set1, set2 -> set1.intersect(set2) }
+    private fun getCommonCategories(categorySets: List<Set<Category>>): Collection<Category> {
+        if (categorySets.isEmpty()) return emptyList()
+        return categorySets.reduce { set1, set2 -> set1.intersect(set2) }
     }
 
     suspend fun getNextUnseenEpisode(anime: Anime): Episode? {
@@ -451,15 +449,14 @@ class AnimeLibraryScreenModel(
     }
 
     /**
-     * Returns the mix (non-common) categories for the given list of anime.
+     * Returns the mix (non-common) categories for the given precomputed per-anime category sets.
      *
-     * @param animes the list of anime.
+     * @param categorySets the per-anime category sets.
      */
-    private suspend fun getMixCategories(animes: List<Anime>): Collection<Category> {
-        if (animes.isEmpty()) return emptyList()
-        val nimeCategories = animes.map { getCategories.await(it.id).toSet() }
-        val common = nimeCategories.reduce { set1, set2 -> set1.intersect(set2) }
-        return nimeCategories.flatten().distinct().subtract(common)
+    private fun getMixCategories(categorySets: List<Set<Category>>): Collection<Category> {
+        if (categorySets.isEmpty()) return emptyList()
+        val common = categorySets.reduce { set1, set2 -> set1.intersect(set2) }
+        return categorySets.flatten().distinct().subtract(common)
     }
 
     fun runDownloadActionSelection(action: DownloadAction) {
@@ -699,10 +696,12 @@ class AnimeLibraryScreenModel(
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
 
+            // Fetch each selected anime's category set once, then derive both sets in memory.
+            val categorySets = animeList.map { getCategories.await(it.id).toSet() }
             // Get indexes of the common categories to preselect.
-            val common = getCommonCategories(animeList)
+            val common = getCommonCategories(categorySets)
             // Get indexes of the mix categories to preselect.
-            val mix = getMixCategories(animeList)
+            val mix = getMixCategories(categorySets)
             val preselected = categories
                 .map {
                     when (it) {
