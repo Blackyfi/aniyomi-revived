@@ -718,6 +718,22 @@ open class MangaLibraryScreenModel(
         mutableState.update { it.copy(dialog = Dialog.DeleteManga(mangaList)) }
     }
 
+    fun openSetMangaTypeDialog() {
+        val mangaList = state.value.selection.map { it.manga }
+        mutableState.update { it.copy(dialog = Dialog.SetMangaType(mangaList)) }
+    }
+
+    /**
+     * Bulk update the [MangaType] of the given manga.
+     */
+    fun setMangaTypeForSelection(mangaList: List<Manga>, type: MangaType) {
+        screenModelScope.launchNonCancellable {
+            updateManga.awaitAll(
+                mangaList.map { MangaUpdate(id = it.id, mangaType = type) },
+            )
+        }
+    }
+
     fun closeDialog() {
         mutableState.update { it.copy(dialog = null) }
     }
@@ -729,6 +745,7 @@ open class MangaLibraryScreenModel(
             val initialSelection: ImmutableList<CheckboxState<Category>>,
         ) : Dialog
         data class DeleteManga(val manga: List<Manga>) : Dialog
+        data class SetMangaType(val manga: List<Manga>) : Dialog
     }
 
     @Immutable

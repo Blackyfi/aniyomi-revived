@@ -32,6 +32,7 @@ import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.entries.components.LibraryBottomActionMenu
+import eu.kanade.presentation.entries.manga.components.SetMangaTypeDialog
 import eu.kanade.presentation.library.DeleteLibraryEntryDialog
 import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.library.manga.MangaLibraryContent
@@ -55,6 +56,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -211,6 +213,7 @@ internal fun MangaLibraryTabContent(
                     .takeIf { state.selection.fastAll { !it.manga.isLocal() } },
                 onDeleteClicked = screenModel::openDeleteMangaDialog,
                 isManga = true,
+                onSetTypeClicked = screenModel::openSetMangaTypeDialog,
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -322,6 +325,16 @@ internal fun MangaLibraryTabContent(
                     screenModel.clearSelection()
                 },
                 isManga = true,
+            )
+        }
+        is MangaLibraryScreenModel.Dialog.SetMangaType -> {
+            SetMangaTypeDialog(
+                currentType = MangaType.UNKNOWN,
+                onDismissRequest = onDismissRequest,
+                onValueChanged = { type ->
+                    screenModel.setMangaTypeForSelection(dialog.manga, type)
+                    screenModel.clearSelection()
+                },
             )
         }
         null -> {}
