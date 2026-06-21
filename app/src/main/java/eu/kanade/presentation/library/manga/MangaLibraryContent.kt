@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.LibraryTabs
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tachiyomi.domain.category.model.Category
@@ -74,6 +76,9 @@ fun MangaLibraryContent(
         }
 
         val notSelectionMode = selection.isEmpty()
+        val selectedIds: ImmutableSet<Long> = remember(selection) {
+            selection.mapTo(HashSet(selection.size)) { it.id }.toImmutableSet()
+        }
         val onClickManga = { manga: LibraryManga ->
             if (notSelectionMode) {
                 onMangaClicked(manga.manga.id)
@@ -100,7 +105,7 @@ fun MangaLibraryContent(
                 state = pagerState,
                 contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
                 hasActiveFilters = hasActiveFilters,
-                selectedManga = selection,
+                selectedIds = selectedIds,
                 searchQuery = searchQuery,
                 onGlobalSearchClicked = onGlobalSearchClicked,
                 getDisplayMode = getDisplayMode,
