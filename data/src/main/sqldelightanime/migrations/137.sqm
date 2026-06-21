@@ -1,0 +1,4 @@
+-- Index the animes_categories FK columns. SQLite does not auto-index FK child
+-- columns, so library joins and getCategoriesByAnimeId previously scanned the table.
+CREATE INDEX animes_categories_anime_id_index ON animes_categories(anime_id);
+CREATE INDEX animes_categories_category_id_index ON animes_categories(category_id);
