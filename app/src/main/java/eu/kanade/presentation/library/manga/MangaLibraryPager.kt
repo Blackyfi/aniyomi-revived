@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.GlobalSearchItem
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
@@ -33,7 +34,7 @@ fun MangaLibraryPager(
     state: PagerState,
     contentPadding: PaddingValues,
     hasActiveFilters: Boolean,
-    selectedManga: List<LibraryManga>,
+    selectedIds: ImmutableSet<Long>,
     searchQuery: String?,
     onGlobalSearchClicked: () -> Unit,
     getDisplayMode: (Int) -> PreferenceMutableState<LibraryDisplayMode>,
@@ -80,7 +81,7 @@ fun MangaLibraryPager(
                         entries = columns,
                         containerHeight = containerHeightPx,
                         contentPadding = contentPadding,
-                        selection = selectedManga,
+                        selectedIds = selectedIds,
                         onClick = onClickManga,
                         onLongClick = onLongClickManga,
                         onClickContinueReading = onClickContinueReading,
@@ -95,7 +96,7 @@ fun MangaLibraryPager(
                         showTitle = displayMode is LibraryDisplayMode.CompactGrid,
                         columns = columns,
                         contentPadding = contentPadding,
-                        selection = selectedManga,
+                        selectedIds = selectedIds,
                         onClick = onClickManga,
                         onLongClick = onLongClickManga,
                         onClickContinueReading = onClickContinueReading,
@@ -109,7 +110,7 @@ fun MangaLibraryPager(
                         items = library,
                         columns = columns,
                         contentPadding = contentPadding,
-                        selection = selectedManga,
+                        selectedIds = selectedIds,
                         onClick = onClickManga,
                         onLongClick = onLongClickManga,
                         onClickContinueReading = onClickContinueReading,

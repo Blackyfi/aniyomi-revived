@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.util.fastAny
 import eu.kanade.presentation.library.components.DownloadsBadge
 import eu.kanade.presentation.library.components.EntryCompactGridItem
 import eu.kanade.presentation.library.components.LanguageBadge
@@ -13,6 +12,7 @@ import eu.kanade.presentation.library.components.LazyLibraryGrid
 import eu.kanade.presentation.library.components.UnviewedBadge
 import eu.kanade.presentation.library.components.globalSearchItem
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
 import tachiyomi.domain.entries.manga.model.MangaCover
 import tachiyomi.domain.library.manga.LibraryManga
 
@@ -22,7 +22,7 @@ internal fun MangaLibraryCompactGrid(
     showTitle: Boolean,
     columns: Int,
     contentPadding: PaddingValues,
-    selection: List<LibraryManga>,
+    selectedIds: ImmutableSet<Long>,
     onClick: (LibraryManga) -> Unit,
     onLongClick: (LibraryManga) -> Unit,
     onClickContinueReading: ((LibraryManga) -> Unit)?,
@@ -38,11 +38,12 @@ internal fun MangaLibraryCompactGrid(
 
         items(
             items = items,
+            key = { it.libraryManga.id },
             contentType = { "manga_library_compact_grid_item" },
         ) { libraryItem ->
             val manga = libraryItem.libraryManga.manga
             EntryCompactGridItem(
-                isSelected = selection.fastAny { it.id == libraryItem.libraryManga.id },
+                isSelected = selectedIds.contains(libraryItem.libraryManga.id),
                 title = manga.title.takeIf { showTitle },
                 coverData = MangaCover(
                     mangaId = manga.id,

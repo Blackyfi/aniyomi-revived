@@ -328,6 +328,7 @@ class AnimeExtensionManager(
     private fun unregisterAnimeExtension(pkgName: String) {
         installedExtensionsMapFlow.value -= pkgName
         untrustedExtensionsMapFlow.value -= pkgName
+        iconMap -= pkgName
     }
 
     /**

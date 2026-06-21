@@ -323,6 +323,7 @@ class MangaExtensionManager(
     private fun unregisterExtension(pkgName: String) {
         installedExtensionsMapFlow.value -= pkgName
         untrustedExtensionsMapFlow.value -= pkgName
+        iconMap -= pkgName
     }
 
     /**

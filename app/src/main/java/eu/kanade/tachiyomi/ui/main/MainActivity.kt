@@ -111,7 +111,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
 import mihon.core.migration.Migrator
 import tachiyomi.core.common.i18n.stringResource
@@ -142,6 +141,10 @@ class MainActivity : BaseActivity() {
     // To be checked by splash screen. If true then splash screen will be removed.
     var ready = false
 
+    // Migration runs off the main thread; the splash screen waits on this flag.
+    private var migrationComplete = false
+    private var didMigration by mutableStateOf(false)
+
     private var navigator: Navigator? = null
 
     init {
@@ -156,7 +159,13 @@ class MainActivity : BaseActivity() {
 
         super.onCreate(savedInstanceState)
 
-        val didMigration = Migrator.awaitAndRelease()
+        lifecycleScope.launchIO {
+            val result = Migrator.awaitAndRelease()
+            withUIContext {
+                didMigration = result
+                migrationComplete = true
+            }
+        }
 
         // Do not let the launcher create a new activity http://stackoverflow.com/questions/16283079
         if (!isTaskRoot) {
@@ -284,7 +293,12 @@ class MainActivity : BaseActivity() {
                 ShowOnboarding()
             }
 
-            var showChangelog by remember { mutableStateOf(didMigration && !BuildConfig.DEBUG) }
+            var showChangelog by remember { mutableStateOf(false) }
+            LaunchedEffect(didMigration) {
+                if (didMigration && !BuildConfig.DEBUG) {
+                    showChangelog = true
+                }
+            }
             if (showChangelog) {
                 AlertDialog(
                     onDismissRequest = { showChangelog = false },
@@ -310,7 +324,9 @@ class MainActivity : BaseActivity() {
         val startTime = System.currentTimeMillis()
         splashScreen?.setKeepOnScreenCondition {
             val elapsed = System.currentTimeMillis() - startTime
-            elapsed <= SPLASH_MIN_DURATION || !ready && elapsed <= SPLASH_MAX_DURATION
+            elapsed <= SPLASH_MIN_DURATION ||
+                (!ready || !migrationComplete) &&
+                elapsed <= SPLASH_MAX_DURATION
         }
         setSplashScreenExitAnimation(splashScreen)
 
@@ -327,13 +343,12 @@ class MainActivity : BaseActivity() {
                 val animeId = savedInstanceState?.getLong(SAVED_STATE_ANIME_KEY)
                 val episodeId = savedInstanceState?.getLong(SAVED_STATE_EPISODE_KEY)
 
-                if (animeId != null && episodeId != null) {
-                    runBlocking {
+                lifecycleScope.launchIO {
+                    if (animeId != null && episodeId != null) {
                         ExternalIntents.externalIntents.initAnime(animeId, episodeId)
                     }
+                    ExternalIntents.externalIntents.onActivityResult(result.data)
                 }
-
-                ExternalIntents.externalIntents.onActivityResult(result.data)
             }
         }
     }

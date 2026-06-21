@@ -221,7 +221,7 @@ class AnimeImageFetcher(
     private fun writeResponseToCoverCache(response: Response, cacheFile: File?): File? {
         if (cacheFile == null || !options.diskCachePolicy.writeEnabled) return null
         return try {
-            response.peekBody(Long.MAX_VALUE).source().use { input ->
+            response.body.source().use { input ->
                 writeSourceToCoverCache(input, cacheFile)
             }
             cacheFile.takeIf { it.exists() }

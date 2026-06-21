@@ -16,10 +16,10 @@ import logcat.LogcatLogger
 object InMemoryLogcatBuffer : LogcatLogger {
 
     /** Maximum number of entries kept. Older entries are evicted first. */
-    private const val MAX_ENTRIES = 2000
+    private const val MAX_ENTRIES = 500
 
     /** Per-entry message cap to avoid a single huge log (e.g. a body dump) eating the buffer. */
-    private const val MAX_MESSAGE_LENGTH = 10_000
+    private const val MAX_MESSAGE_LENGTH = 4_000
 
     data class Entry(
         val timeMillis: Long,

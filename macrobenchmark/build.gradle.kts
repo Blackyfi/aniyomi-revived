@@ -1,5 +1,6 @@
 plugins {
     id("mihon.benchmark")
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 android {

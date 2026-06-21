@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.LibraryTabs
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tachiyomi.domain.category.model.Category
@@ -74,6 +76,9 @@ fun AnimeLibraryContent(
         }
 
         val notSelectionMode = selection.isEmpty()
+        val selectedIds: ImmutableSet<Long> = remember(selection) {
+            selection.mapTo(HashSet(selection.size)) { it.id }.toImmutableSet()
+        }
         val onClickAnime = { anime: LibraryAnime ->
             if (notSelectionMode) {
                 onAnimeClicked(anime.anime.id)
@@ -100,7 +105,7 @@ fun AnimeLibraryContent(
                 state = pagerState,
                 contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
                 hasActiveFilters = hasActiveFilters,
-                selectedAnime = selection,
+                selectedIds = selectedIds,
                 searchQuery = searchQuery,
                 onGlobalSearchClicked = onGlobalSearchClicked,
                 getDisplayMode = getDisplayMode,

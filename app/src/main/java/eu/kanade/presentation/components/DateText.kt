@@ -18,13 +18,14 @@ import java.time.ZoneId
 fun relativeDateText(
     dateEpochMillis: Long,
 ): String {
-    return relativeDateText(
-        localDate = LocalDate.ofInstant(
+    val localDate = remember(dateEpochMillis) {
+        LocalDate.ofInstant(
             Instant.ofEpochMilli(dateEpochMillis),
             ZoneId.systemDefault(),
         )
-            .takeIf { dateEpochMillis > 0L },
-    )
+            .takeIf { dateEpochMillis > 0L }
+    }
+    return relativeDateText(localDate = localDate)
 }
 
 // For use in chapter/episode release time
@@ -32,13 +33,14 @@ fun relativeDateText(
 fun relativeDateTimeText(
     dateEpochMillis: Long,
 ): String {
-    return relativeDateTimeText(
-        localDateTime = LocalDateTime.ofInstant(
+    val localDateTime = remember(dateEpochMillis) {
+        LocalDateTime.ofInstant(
             Instant.ofEpochMilli(dateEpochMillis),
             ZoneId.systemDefault(),
         )
-            .takeIf { dateEpochMillis > 0L },
-    )
+            .takeIf { dateEpochMillis > 0L }
+    }
+    return relativeDateTimeText(localDateTime = localDateTime)
 }
 
 @Composable
@@ -51,12 +53,15 @@ fun relativeDateText(
     val relativeTime = remember { preferences.relativeTime().get() }
     val dateFormat = remember { UiPreferences.dateFormat(preferences.dateFormat().get()) }
 
-    return localDate?.toRelativeString(
-        context = context,
-        relative = relativeTime,
-        dateFormat = dateFormat,
-    )
-        ?: stringResource(MR.strings.not_applicable)
+    val relativeText = remember(localDate, relativeTime, dateFormat, context) {
+        localDate?.toRelativeString(
+            context = context,
+            relative = relativeTime,
+            dateFormat = dateFormat,
+        )
+    }
+
+    return relativeText ?: stringResource(MR.strings.not_applicable)
 }
 
 // For use in chapter/episode release time
@@ -70,10 +75,13 @@ fun relativeDateTimeText(
     val relativeTime = remember { preferences.relativeTime().get() }
     val dateFormat = remember { UiPreferences.dateFormat(preferences.dateFormat().get()) }
 
-    return localDateTime?.toRelativeString(
-        context = context,
-        relative = relativeTime,
-        dateFormat = dateFormat,
-    )
-        ?: stringResource(MR.strings.not_applicable)
+    val relativeText = remember(localDateTime, relativeTime, dateFormat, context) {
+        localDateTime?.toRelativeString(
+            context = context,
+            relative = relativeTime,
+            dateFormat = dateFormat,
+        )
+    }
+
+    return relativeText ?: stringResource(MR.strings.not_applicable)
 }

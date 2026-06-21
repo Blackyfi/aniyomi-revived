@@ -303,6 +303,9 @@ class PlayerActivity : BaseActivity() {
             noisyReceiver.initialized = false
         }
 
+        pipReceiver?.let { runCatching { unregisterReceiver(it) } }
+        pipReceiver = null
+
         MPVLib.removeLogObserver(playerObserver)
         MPVLib.removeObserver(playerObserver)
         player.destroy()
