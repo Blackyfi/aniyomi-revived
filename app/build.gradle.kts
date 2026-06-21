@@ -9,6 +9,7 @@ plugins {
     id("com.github.zellius.shortcut-helper")
     kotlin("plugin.serialization")
     alias(libs.plugins.aboutLibraries)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 shortcutHelper.setFilePath("./shortcuts.xml")
@@ -289,6 +290,9 @@ dependencies {
 
     // Shizuku
     implementation(libs.bundles.shizuku)
+
+    // Baseline profile generation (perf-audit F18)
+    baselineProfile(projects.macrobenchmark)
 
     // Tests
     testImplementation(libs.bundles.test)
