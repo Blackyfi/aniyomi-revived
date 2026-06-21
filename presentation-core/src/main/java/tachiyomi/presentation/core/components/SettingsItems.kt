@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -58,6 +62,7 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import dev.icerock.moko.resources.StringResource
@@ -567,6 +572,130 @@ fun TextItem(
         onValueChange = onChange,
         singleLine = true,
     )
+}
+
+@Composable
+fun AutoCompleteItem(
+    label: String,
+    hint: String,
+    value: String,
+    suggestions: List<String>,
+    onChange: (String) -> Unit,
+) {
+    // The "active token" is the part of the text the user is currently typing,
+    // i.e. everything after the last ',' or ';' separator.
+    val lastSeparatorIndex = maxOf(value.lastIndexOf(','), value.lastIndexOf(';'))
+    val rawActiveToken = value.substring(lastSeparatorIndex + 1).trimStart()
+    val activeHasExclude = rawActiveToken.startsWith("-")
+    val activeToken = (if (activeHasExclude) rawActiveToken.drop(1) else rawActiveToken).trimStart()
+
+    val matches = remember(activeToken, suggestions) {
+        if (activeToken.isBlank()) {
+            emptyList()
+        } else {
+            suggestions.asSequence()
+                .filter { it.contains(activeToken, ignoreCase = true) }
+                .take(25)
+                .toList()
+        }
+    }
+
+    // Completed tokens used for the validity chips below the field.
+    val tokens = remember(value) {
+        value.split(',', ';')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = SettingsItemsPaddings.Horizontal, vertical = 4.dp),
+    ) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(text = label) },
+            placeholder = {
+                if (hint.isNotEmpty()) {
+                    Text(
+                        text = hint,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                            .copy(alpha = DISABLED_ALPHA),
+                    )
+                }
+            },
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+        )
+
+        if (matches.isNotEmpty()) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                tonalElevation = 2.dp,
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    matches.forEach { suggestion ->
+                        Text(
+                            text = suggestion,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val prefix = value.substring(0, lastSeparatorIndex + 1)
+                                    val separator = if (prefix.isEmpty()) "" else " "
+                                    val newToken = (if (activeHasExclude) "-" else "") + suggestion
+                                    onChange(prefix + separator + newToken + ", ")
+                                }
+                                .padding(
+                                    horizontal = SettingsItemsPaddings.Horizontal,
+                                    vertical = SettingsItemsPaddings.Vertical,
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+
+        if (tokens.isNotEmpty()) {
+            val validColor = Color(0xFF2E7D32)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
+            ) {
+                tokens.forEach { token ->
+                    val excluded = token.startsWith("-")
+                    val core = (if (excluded) token.drop(1) else token).trim()
+                    val valid = suggestions.any { it.equals(core, ignoreCase = true) }
+                    val container = if (valid) validColor else MaterialTheme.colorScheme.errorContainer
+                    val content = if (valid) Color.White else MaterialTheme.colorScheme.onErrorContainer
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = container,
+                        contentColor = content,
+                    ) {
+                        Text(
+                            text = (if (excluded) "-" else "") + core,
+                            style = MaterialTheme.typography.labelMedium,
+                            textDecoration = if (excluded) TextDecoration.LineThrough else null,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
