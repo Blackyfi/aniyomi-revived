@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.GetApp
@@ -199,17 +199,21 @@ private fun AnimeExtensionContent(
                 }
             }
 
-            items(
+            itemsIndexed(
                 items = items,
-                contentType = { "item" },
-                key = { item ->
-                    when (item.extension) {
-                        is AnimeExtension.Untrusted -> "extension-untrusted-${item.hashCode()}"
-                        is AnimeExtension.Installed -> "extension-installed-${item.hashCode()}"
-                        is AnimeExtension.Available -> "extension-available-${item.hashCode()}"
+                contentType = { _, _ -> "item" },
+                // Key by the stable group header plus position. item.hashCode() is not
+                // collision-free: identical Available entries (e.g. the same extension served
+                // by a duplicate repo) produced the same key and crashed the LazyColumn.
+                key = { index, item ->
+                    val type = when (item.extension) {
+                        is AnimeExtension.Untrusted -> "untrusted"
+                        is AnimeExtension.Installed -> "installed"
+                        is AnimeExtension.Available -> "available"
                     }
+                    "extension-$type-${header.hashCode()}-$index"
                 },
-            ) { item ->
+            ) { _, item ->
                 AnimeExtensionItem(
                     item = item,
                     modifier = Modifier.animateItemFastScroll(),
