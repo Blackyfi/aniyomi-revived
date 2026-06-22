@@ -179,7 +179,10 @@ class MangaDownloadManager(
         }
         return files.sortedBy { it.name }
             .mapIndexed { i, file ->
-                Page(i, uri = file.uri).apply { status = Page.State.READY }
+                Page(i).apply {
+                    uri = file.uri
+                    status = Page.State.READY
+                }
             }
     }
 

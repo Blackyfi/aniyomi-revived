@@ -12,8 +12,13 @@ open class Page(
     val index: Int,
     val url: String = "",
     var imageUrl: String? = null,
-    @Transient var uri: Uri? = null, // Deprecated but can't be deleted due to extensions
 ) : ProgressListener {
+
+    // Kept out of the primary constructor so the generated constructor stays binary-compatible
+    // with extensions compiled against upstream's 3-arg Page. Deprecated but can't be deleted
+    // due to extensions that still reference it.
+    @Transient
+    var uri: Uri? = null
 
     val number: Int
         get() = index + 1
