@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.source
 
+import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 
 /**
@@ -27,6 +28,18 @@ interface MultiSourceCatalogSource : MangaSource {
      * @return the refreshed source list.
      */
     fun setMangaSource(manga: SManga, sourceKey: String): List<MangaSourceInfo>
+
+    /**
+     * Chapters for a specific [sourceKey] WITHOUT changing the active source. Lets the app prefetch
+     * alternate sources and switch between them instantly (no waiting on [setMangaSource]).
+     *
+     * The default returns an empty list; callers must fall back to the normal effective-source
+     * chapter list (via [setMangaSource] + [getChapterList]) when that happens, so sources that
+     * don't support per-source reads keep working.
+     *
+     * @param sourceKey one of the [MangaSourceInfo.key] values, or "auto".
+     */
+    fun getChapterListForSource(manga: SManga, sourceKey: String): List<SChapter> = emptyList()
 }
 
 /** One selectable source for a manga. */

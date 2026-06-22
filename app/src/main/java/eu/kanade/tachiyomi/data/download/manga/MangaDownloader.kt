@@ -343,19 +343,26 @@ class MangaDownloader(
                 it.pages == null &&
                 it.status.value <= MangaDownload.State.DOWNLOADING.value
         }
-        pending.forEach { download ->
-            try {
-                val pages = download.source.getPageList(download.chapter.toSChapter())
-                if (pages.isNotEmpty()) {
-                    // Don't trust index from source (mirrors downloadChapter).
-                    download.pages = pages.mapIndexed { index, page ->
-                        Page(index, page.url, page.imageUrl).also { it.uri = page.uri }
+        if (pending.isEmpty()) return
+        // Freeze concurrently so this never noticeably delays a source switch, even with a long
+        // queue. supervisorScope isolates per-download failures and still awaits them all.
+        supervisorScope {
+            pending.forEach { download ->
+                launch {
+                    try {
+                        val pages = download.source.getPageList(download.chapter.toSChapter())
+                        if (pages.isNotEmpty()) {
+                            // Don't trust index from source (mirrors downloadChapter).
+                            download.pages = pages.mapIndexed { index, page ->
+                                Page(index, page.url, page.imageUrl).also { it.uri = page.uri }
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        if (e is CancellationException) throw e
+                        // Leave pages null so the chapter falls back to a lazy fetch during download.
+                        logcat(LogPriority.ERROR, e) { "Failed to freeze page list for ${download.chapter.name}" }
                     }
                 }
-            } catch (e: Throwable) {
-                if (e is CancellationException) throw e
-                // Leave pages null so the chapter falls back to a lazy fetch during download.
-                logcat(LogPriority.ERROR, e) { "Failed to freeze page list for ${download.chapter.name}" }
             }
         }
     }
