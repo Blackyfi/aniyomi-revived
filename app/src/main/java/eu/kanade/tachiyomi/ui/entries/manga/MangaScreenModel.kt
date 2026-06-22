@@ -40,6 +40,7 @@ import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.MangaSource
 import eu.kanade.tachiyomi.source.MangaSourceInfo
 import eu.kanade.tachiyomi.source.MultiSourceCatalogSource
+import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
@@ -93,6 +94,7 @@ import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.source.local.entries.manga.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
 
 class MangaScreenModel(
@@ -647,6 +649,13 @@ class MangaScreenModel(
     // Multi-source picker - start
 
     /**
+     * Per-source chapter lists prefetched for this manga, keyed by [MangaSourceInfo.key]. Populated
+     * in the background when the screen opens so [switchSource] can render a source's chapters
+     * instantly instead of waiting on the network. Lives for the duration of the screen.
+     */
+    private val prefetchedSourceChapters = ConcurrentHashMap<String, List<SChapter>>()
+
+    /**
      * Loads the alternate sources for this manga, if the source supports them.
      * No-op (and the picker stays hidden) for ordinary single sources.
      */
@@ -677,6 +686,9 @@ class MangaScreenModel(
                         " — card shows when size > 1"
                 }
                 updateSuccessState { it.copy(availableSources = sources) }
+                if (sources.size > 1) {
+                    prefetchSourceChapters(source, state.manga, sources)
+                }
             } catch (e: Throwable) {
                 logcat(LogPriority.ERROR, e) { "SourcePicker: Failed to load alternate sources" }
             }
@@ -684,9 +696,39 @@ class MangaScreenModel(
     }
 
     /**
-     * Switches the manga's active source on the server, then re-pulls its chapter
-     * list. Chapter URLs are keyed by chapter number (not source), so Aniyomi
-     * preserves read/bookmark state for shared chapter numbers across the switch.
+     * Warms [prefetchedSourceChapters] in the background for every alternate source, using the
+     * read-only per-source chapter read, so a later [switchSource] is instant. Best-effort: any
+     * source that fails (or that the extension doesn't support) is simply skipped.
+     */
+    private fun prefetchSourceChapters(
+        source: MultiSourceCatalogSource,
+        manga: Manga,
+        sources: List<MangaSourceInfo>,
+    ) {
+        screenModelScope.launchIO {
+            val sManga = manga.toSManga()
+            sources.forEach { info ->
+                if (prefetchedSourceChapters.containsKey(info.key)) return@forEach
+                try {
+                    val chapters = withIOContext { source.getChapterListForSource(sManga, info.key) }
+                    if (chapters.isNotEmpty()) {
+                        prefetchedSourceChapters[info.key] = chapters
+                    }
+                } catch (e: Throwable) {
+                    logcat(LogPriority.ERROR, e) { "SourcePicker: prefetch failed for source ${info.key}" }
+                }
+            }
+        }
+    }
+
+    /**
+     * Switches the manga's active source. Chapter URLs are keyed by chapter number (not source), so
+     * Aniyomi preserves read/bookmark state for shared chapter numbers across the switch.
+     *
+     * To keep this snappy the work is reordered: the target source's chapters are shown first (from
+     * the prefetch cache when warm, otherwise a single read-only fetch that does NOT wait on the
+     * server-side switch), and only then is the active source persisted on the server in the
+     * background. The download-pin still runs before that server-side switch.
      *
      * @param sourceKey a [MangaSourceInfo.key], or "auto".
      */
@@ -696,16 +738,38 @@ class MangaScreenModel(
         logcat(LogPriority.INFO) { "SourcePicker: switching to source key='$sourceKey' for mangaId=$mangaId" }
         screenModelScope.launchIO {
             updateSuccessState { it.copy(isRefreshingData = true) }
+            var chaptersShown = false
             try {
-                // Pin any in-flight/queued downloads to the CURRENT source before the server-side
-                // switch, so the switch can't redirect their pages to the new source's content.
+                // 1) Render the target source's chapters as soon as possible. A cache hit means no
+                //    network at all; otherwise a single read-only fetch (no dependency on the switch).
+                //    Any failure here just leaves the list empty and falls through to the legacy path.
+                val targetChapters = try {
+                    prefetchedSourceChapters[sourceKey]
+                        ?: withIOContext { source.getChapterListForSource(state.manga.toSManga(), sourceKey) }
+                            .also { if (it.isNotEmpty()) prefetchedSourceChapters[sourceKey] = it }
+                } catch (e: Throwable) {
+                    logcat(LogPriority.ERROR, e) { "SourcePicker: per-source read failed, using legacy path" }
+                    emptyList()
+                }
+                if (targetChapters.isNotEmpty()) {
+                    syncChaptersWithSource.await(targetChapters, state.manga, state.source, false)
+                    chaptersShown = true
+                    // List is up to date — drop the refresh indicator now; the server-side switch
+                    // below only affects page serving and the picker badges.
+                    updateSuccessState { it.copy(isRefreshingData = false) }
+                }
+
+                // 2) Pin in-flight downloads to the CURRENT source, then persist the active source on
+                //    the server (page serving + picker badges stay in sync with the web UI).
                 downloadManager.freezeQueuedPageLists(state.manga.id)
                 val sources = withIOContext { source.setMangaSource(state.manga.toSManga(), sourceKey) }
-                logcat(LogPriority.INFO) {
-                    "SourcePicker: setMangaSource ok — now ${sources.size} source(s), refreshing chapters"
-                }
+                logcat(LogPriority.INFO) { "SourcePicker: setMangaSource ok — now ${sources.size} source(s)" }
                 updateSuccessState { it.copy(availableSources = sources) }
-                fetchChaptersFromSource(manualFetch = false)
+
+                // 3) Fallback for extensions without per-source reads: pull the effective list now.
+                if (!chaptersShown) {
+                    fetchChaptersFromSource(manualFetch = false)
+                }
             } catch (e: Throwable) {
                 logcat(LogPriority.ERROR, e) { "SourcePicker: Failed to switch source" }
                 screenModelScope.launch {
