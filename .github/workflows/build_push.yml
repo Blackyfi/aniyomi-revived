@@ -10,9 +10,13 @@ on:
     tags:
       - v*
 
+# Keyed on the commit SHA so a release (branch push + tag push of the same
+# commit) collapses into one group. cancel-in-progress is true only for the
+# tag run, so the tag run cancels the redundant branch build but the branch
+# build can never cancel the release run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
