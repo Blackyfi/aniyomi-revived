@@ -186,7 +186,7 @@ class MangaScreenModel(
                     updateSuccessState {
                         it.copy(
                             manga = manga,
-                            chapters = chapters.toChapterListItems(manga),
+                            chapters = chapters.toChapterListItems(manga, it.effectiveSourceKey),
                         )
                     }
                 }
@@ -541,6 +541,9 @@ class MangaScreenModel(
 
     private fun updateDownloadState(download: MangaDownload) {
         updateSuccessState { successState ->
+            // Don't paint a pinned download's progress onto a different source's view of the
+            // shared chapter row (see toChapterListItems).
+            if (!download.belongsToSource(successState.effectiveSourceKey)) return@updateSuccessState successState
             val modifiedIndex = successState.chapters.indexOfFirst { it.id == download.chapter.id }
             if (modifiedIndex < 0) return@updateSuccessState successState
 
@@ -553,13 +556,21 @@ class MangaScreenModel(
         }
     }
 
-    private fun List<Chapter>.toChapterListItems(manga: Manga): List<ChapterList.Item> {
+    private fun List<Chapter>.toChapterListItems(
+        manga: Manga,
+        effectiveSourceKey: String? = null,
+    ): List<ChapterList.Item> {
         val isLocal = manga.isLocal()
         return map { chapter ->
             val activeDownload = if (isLocal) {
                 null
             } else {
                 downloadManager.getQueuedDownloadOrNull(chapter.id)
+                    // For multi-source entries (e.g. MangaVault), a chapter row is shared across
+                    // sources. Only surface a download's progress on the source it was started from,
+                    // so switching sources doesn't make the other source's view look like it is
+                    // downloading. The download itself is pinned and still finishes safely.
+                    ?.takeIf { it.belongsToSource(effectiveSourceKey) }
             }
             val downloaded = if (isLocal) {
                 true
@@ -584,6 +595,17 @@ class MangaScreenModel(
                 selected = chapter.id in selectedChapterIds,
             )
         }
+    }
+
+    /**
+     * Whether [this] download should be surfaced on a manga screen currently showing
+     * [effectiveSourceKey]. Always true for ordinary downloads (no source key) or when the
+     * effective source is unknown; for pinned multi-source downloads it is true only on the source
+     * the download was started from.
+     */
+    private fun MangaDownload.belongsToSource(effectiveSourceKey: String?): Boolean {
+        val key = sourceKey
+        return key == null || effectiveSourceKey == null || key == effectiveSourceKey
     }
 
     /**
@@ -675,6 +697,9 @@ class MangaScreenModel(
         screenModelScope.launchIO {
             updateSuccessState { it.copy(isRefreshingData = true) }
             try {
+                // Pin any in-flight/queued downloads to the CURRENT source before the server-side
+                // switch, so the switch can't redirect their pages to the new source's content.
+                downloadManager.freezeQueuedPageLists(state.manga.id)
                 val sources = withIOContext { source.setMangaSource(state.manga.toSManga(), sourceKey) }
                 logcat(LogPriority.INFO) {
                     "SourcePicker: setMangaSource ok — now ${sources.size} source(s), refreshing chapters"
@@ -915,8 +940,10 @@ class MangaScreenModel(
      * @param chapters the list of chapters to download.
      */
     private fun downloadChapters(chapters: List<Chapter>) {
-        val manga = successState?.manga ?: return
-        downloadManager.downloadChapters(manga, chapters)
+        val state = successState ?: return
+        // Pin the download to the source effective right now so its progress is only shown on that
+        // source and a later source switch can't redirect its pages.
+        downloadManager.downloadChapters(state.manga, chapters, sourceKey = state.effectiveSourceKey)
         toggleAllSelection(false)
     }
 
@@ -1253,6 +1280,15 @@ class MangaScreenModel(
             val dialog: Dialog? = null,
             val hasPromptedToAddBefore: Boolean = false,
         ) : State {
+
+            /**
+             * Key of the upstream source currently serving this manga's pages, for
+             * [MultiSourceCatalogSource] entries. Null for ordinary sources or before the alternate
+             * source list has loaded. Used to pin/scope downloads to the source they belong to.
+             */
+            val effectiveSourceKey: String?
+                get() = availableSources.firstOrNull { it.isEffective }?.key
+                    ?: availableSources.firstOrNull { it.isDefault }?.key
             val processedChapters by lazy {
                 chapters.applyFilters(manga).toList()
             }
