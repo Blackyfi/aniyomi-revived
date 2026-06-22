@@ -24,6 +24,15 @@ data class MangaDownload(
     val chapter: Chapter,
 ) {
 
+    /**
+     * Key of the upstream source that was effective when this download was enqueued, for
+     * [eu.kanade.tachiyomi.source.MultiSourceCatalogSource] entries (e.g. MangaVault). Null for
+     * ordinary single-source downloads. Used to pin the download's identity to the source it was
+     * started from so that switching the manga's active source neither redirects its pages nor
+     * surfaces its progress on a different source's view of the (shared) chapter row.
+     */
+    var sourceKey: String? = null
+
     var pages: List<Page>? = null
 
     val totalProgress: Int

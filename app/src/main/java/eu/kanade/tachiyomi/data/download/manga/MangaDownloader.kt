@@ -284,7 +284,7 @@ class MangaDownloader(
      * @param chapters the list of chapters to download.
      * @param autoStart whether to start the downloader after enqueing the chapters.
      */
-    fun queueChapters(manga: Manga, chapters: List<Chapter>, autoStart: Boolean) {
+    fun queueChapters(manga: Manga, chapters: List<Chapter>, autoStart: Boolean, sourceKey: String? = null) {
         if (chapters.isEmpty()) return
 
         val source = sourceManager.get(manga.source) as? HttpSource ?: return
@@ -296,8 +296,8 @@ class MangaDownloader(
             .sortedByDescending { it.sourceOrder }
             // Filter out those already enqueued.
             .filter { chapter -> queueState.value.none { it.chapter.id == chapter.id } }
-            // Create a download for each one.
-            .map { MangaDownload(source, manga, it) }
+            // Create a download for each one, pinned to the source effective at enqueue time.
+            .map { MangaDownload(source, manga, it).apply { this.sourceKey = sourceKey } }
             .toList()
 
         if (chaptersToQueue.isNotEmpty()) {
@@ -322,6 +322,40 @@ class MangaDownloader(
                     )
                 }
                 MangaDownloadJob.start(context)
+            }
+        }
+    }
+
+    /**
+     * Eagerly resolves and caches the page list (absolute image URLs) of every queued,
+     * not-yet-fetched chapter of [mangaId], pinning their content to the source that is
+     * effective right now.
+     *
+     * Call this BEFORE switching a [eu.kanade.tachiyomi.source.MultiSourceCatalogSource]'s active
+     * source: those entries serve pages from whichever upstream is currently effective, so an
+     * in-flight switch would otherwise redirect pending downloads to the new source's pages. Once
+     * the page list is frozen here, the download holds absolute image URLs and is immune to the
+     * switch.
+     */
+    suspend fun freezeQueuedPageLists(mangaId: Long) {
+        val pending = queueState.value.filter {
+            it.manga.id == mangaId &&
+                it.pages == null &&
+                it.status.value <= MangaDownload.State.DOWNLOADING.value
+        }
+        pending.forEach { download ->
+            try {
+                val pages = download.source.getPageList(download.chapter.toSChapter())
+                if (pages.isNotEmpty()) {
+                    // Don't trust index from source (mirrors downloadChapter).
+                    download.pages = pages.mapIndexed { index, page ->
+                        Page(index, page.url, page.imageUrl).also { it.uri = page.uri }
+                    }
+                }
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                // Leave pages null so the chapter falls back to a lazy fetch during download.
+                logcat(LogPriority.ERROR, e) { "Failed to freeze page list for ${download.chapter.name}" }
             }
         }
     }

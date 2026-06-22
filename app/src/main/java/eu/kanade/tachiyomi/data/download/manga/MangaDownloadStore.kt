@@ -99,13 +99,13 @@ class MangaDownloadStore(
         val downloads = mutableListOf<MangaDownload>()
         if (objs.isNotEmpty()) {
             val cachedManga = mutableMapOf<Long, Manga?>()
-            for ((mangaId, chapterId) in objs) {
-                val manga = cachedManga.getOrPut(mangaId) {
-                    runBlocking { getManga.await(mangaId) }
+            for (obj in objs) {
+                val manga = cachedManga.getOrPut(obj.mangaId) {
+                    runBlocking { getManga.await(obj.mangaId) }
                 } ?: continue
                 val source = sourceManager.get(manga.source) as? HttpSource ?: continue
-                val chapter = runBlocking { getChapter.await(chapterId) } ?: continue
-                downloads.add(MangaDownload(source, manga, chapter))
+                val chapter = runBlocking { getChapter.await(obj.chapterId) } ?: continue
+                downloads.add(MangaDownload(source, manga, chapter).apply { sourceKey = obj.sourceKey })
             }
         }
 
@@ -120,7 +120,7 @@ class MangaDownloadStore(
      * @param download the download to serialize.
      */
     private fun serialize(download: MangaDownload): String {
-        val obj = DownloadObject(download.manga.id, download.chapter.id, counter++)
+        val obj = DownloadObject(download.manga.id, download.chapter.id, counter++, download.sourceKey)
         return json.encodeToString(obj)
     }
 
@@ -144,6 +144,12 @@ class MangaDownloadStore(
  * @param mangaId the id of the manga.
  * @param chapterId the id of the chapter.
  * @param order the order of the download in the queue.
+ * @param sourceKey the multi-source upstream key the download was pinned to, if any.
  */
 @Serializable
-private data class DownloadObject(val mangaId: Long, val chapterId: Long, val order: Int)
+private data class DownloadObject(
+    val mangaId: Long,
+    val chapterId: Long,
+    val order: Int,
+    val sourceKey: String? = null,
+)
