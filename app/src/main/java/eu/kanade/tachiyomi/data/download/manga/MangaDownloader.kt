@@ -364,8 +364,7 @@ class MangaDownloader(
                         index,
                         page.url,
                         page.imageUrl,
-                        page.uri,
-                    )
+                    ).also { it.uri = page.uri }
                 }
                 download.pages = reIndexedPages
                 reIndexedPages
