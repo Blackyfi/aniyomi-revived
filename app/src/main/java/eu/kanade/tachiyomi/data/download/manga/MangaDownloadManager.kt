@@ -138,8 +138,23 @@ class MangaDownloadManager(
      * @param chapters the list of chapters to enqueue.
      * @param autoStart whether to start the downloader after enqueing the chapters.
      */
-    fun downloadChapters(manga: Manga, chapters: List<Chapter>, autoStart: Boolean = true) {
-        downloader.queueChapters(manga, chapters, autoStart)
+    fun downloadChapters(
+        manga: Manga,
+        chapters: List<Chapter>,
+        autoStart: Boolean = true,
+        sourceKey: String? = null,
+    ) {
+        downloader.queueChapters(manga, chapters, autoStart, sourceKey)
+    }
+
+    /**
+     * Pins every queued, not-yet-fetched download of [mangaId] to the source effective right now by
+     * resolving its page list ahead of time. Must be called before switching a
+     * [eu.kanade.tachiyomi.source.MultiSourceCatalogSource]'s active source so the switch can't
+     * redirect pending downloads to the new source's pages.
+     */
+    suspend fun freezeQueuedPageLists(mangaId: Long) {
+        downloader.freezeQueuedPageLists(mangaId)
     }
 
     /**
