@@ -93,6 +93,18 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
     override suspend fun doWork(): Result {
         if (tags.contains(WORK_NAME_AUTO)) {
+            // Skip this scheduled run if it falls outside the user's daily update window.
+            // The next periodic run will retry; we report success so WorkManager keeps the schedule.
+            if (libraryPreferences.autoUpdateTimeRestricted().get() &&
+                !LibraryPreferences.isWithinUpdateWindow(
+                    libraryPreferences.autoUpdateStartHour().get(),
+                    libraryPreferences.autoUpdateEndHour().get(),
+                    ZonedDateTime.now().hour,
+                )
+            ) {
+                return Result.success()
+            }
+
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                 val preferences = Injekt.get<LibraryPreferences>()
                 val restrictions = preferences.autoUpdateDeviceRestrictions().get()
