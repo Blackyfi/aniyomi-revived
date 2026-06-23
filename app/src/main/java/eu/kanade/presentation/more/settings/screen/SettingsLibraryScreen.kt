@@ -165,6 +165,12 @@ object SettingsLibraryScreen : SearchableSettings {
         val autoUpdateIntervalPref = libraryPreferences.autoUpdateInterval()
         val autoUpdateInterval by autoUpdateIntervalPref.collectAsState()
 
+        val autoUpdateTimeRestrictedPref = libraryPreferences.autoUpdateTimeRestricted()
+        val autoUpdateTimeRestricted by autoUpdateTimeRestrictedPref.collectAsState()
+        val updateHourEntries = remember {
+            (0..23).associateWith { "%02d:00".format(it) }.toImmutableMap()
+        }
+
         val animeAutoUpdateCategoriesPref = libraryPreferences.animeUpdateCategories()
         val animeAutoUpdateCategoriesExcludePref =
             libraryPreferences.animeUpdateCategoriesExclude()
@@ -226,6 +232,7 @@ object SettingsLibraryScreen : SearchableSettings {
                     preference = autoUpdateIntervalPref,
                     entries = persistentMapOf(
                         0 to stringResource(MR.strings.update_never),
+                        6 to stringResource(MR.strings.update_6hour),
                         12 to stringResource(MR.strings.update_12hour),
                         24 to stringResource(MR.strings.update_24hour),
                         48 to stringResource(MR.strings.update_48hour),
@@ -238,6 +245,24 @@ object SettingsLibraryScreen : SearchableSettings {
                         AnimeLibraryUpdateJob.setupTask(context, it)
                         true
                     },
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = autoUpdateTimeRestrictedPref,
+                    title = stringResource(AYMR.strings.pref_library_update_time_restriction),
+                    subtitle = stringResource(AYMR.strings.pref_library_update_time_restriction_summary),
+                    enabled = autoUpdateInterval > 0,
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = libraryPreferences.autoUpdateStartHour(),
+                    entries = updateHourEntries,
+                    title = stringResource(AYMR.strings.pref_library_update_start_time),
+                    enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = libraryPreferences.autoUpdateEndHour(),
+                    entries = updateHourEntries,
+                    title = stringResource(AYMR.strings.pref_library_update_end_time),
+                    enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
                 ),
                 Preference.PreferenceItem.MultiSelectListPreference(
                     preference = libraryPreferences.autoUpdateDeviceRestrictions(),

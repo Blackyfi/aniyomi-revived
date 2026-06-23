@@ -39,6 +39,11 @@ class LibraryPreferences(
     fun lastUpdatedTimestamp() = preferenceStore.getLong(Preference.appStateKey("library_update_last_timestamp"), 0L)
     fun autoUpdateInterval() = preferenceStore.getInt("pref_library_update_interval_key", 0)
 
+    // Restrict automatic updates to a daily time window, expressed in the device's local hours.
+    fun autoUpdateTimeRestricted() = preferenceStore.getBoolean("library_update_time_restricted", false)
+    fun autoUpdateStartHour() = preferenceStore.getInt("library_update_start_hour", 6)
+    fun autoUpdateEndHour() = preferenceStore.getInt("library_update_end_hour", 22)
+
     fun autoUpdateDeviceRestrictions() = preferenceStore.getStringSet(
         "library_update_restriction",
         setOf(
@@ -396,6 +401,19 @@ class LibraryPreferences(
     }
 
     companion object {
+        /**
+         * Returns whether [hour] (0-23, device local time) falls inside the inclusive auto-update
+         * window bounded by [startHour] and [endHour]. Supports windows that wrap past midnight
+         * (e.g. 22 -> 6). When both bounds are equal the window covers the whole day.
+         */
+        fun isWithinUpdateWindow(startHour: Int, endHour: Int, hour: Int): Boolean {
+            return when {
+                startHour == endHour -> true
+                startHour < endHour -> hour in startHour until endHour
+                else -> hour >= startHour || hour < endHour
+            }
+        }
+
         const val DEVICE_ONLY_ON_WIFI = "wifi"
         const val DEVICE_NETWORK_NOT_METERED = "network_not_metered"
         const val DEVICE_CHARGING = "ac"
