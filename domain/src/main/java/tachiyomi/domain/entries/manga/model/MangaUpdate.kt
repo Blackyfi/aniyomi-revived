@@ -25,6 +25,7 @@ data class MangaUpdate(
     val initialized: Boolean? = null,
     val version: Long? = null,
     val mangaType: MangaType? = null,
+    val downloadNewChapters: Boolean? = null,
 )
 
 fun Manga.toMangaUpdate(): MangaUpdate {
@@ -51,5 +52,6 @@ fun Manga.toMangaUpdate(): MangaUpdate {
         initialized = initialized,
         version = version,
         mangaType = mangaType,
+        downloadNewChapters = downloadNewChapters,
     )
 }

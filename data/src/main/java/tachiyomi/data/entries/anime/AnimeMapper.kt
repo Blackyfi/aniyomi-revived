@@ -41,6 +41,7 @@ object AnimeMapper {
         seasonSourceOrder: Long,
         backgroundUrl: String?,
         backgroundLastModified: Long,
+        downloadNewEpisodes: Boolean,
     ): Anime = Anime(
         id = id,
         source = source,
@@ -72,6 +73,7 @@ object AnimeMapper {
         seasonFlags = seasonFlags,
         seasonNumber = seasonNumber,
         seasonSourceOrder = seasonSourceOrder,
+        downloadNewEpisodes = downloadNewEpisodes,
     )
 
     fun mapLibraryAnime(
@@ -106,6 +108,7 @@ object AnimeMapper {
         seasonSourceOrder: Long,
         backgroundUrl: String?,
         backgroundLastModified: Long,
+        downloadNewEpisodes: Boolean,
         totalCount: Long,
         seenCount: Double,
         latestUpload: Long,
@@ -147,6 +150,7 @@ object AnimeMapper {
             seasonSourceOrder,
             backgroundUrl,
             backgroundLastModified,
+            downloadNewEpisodes,
         ),
         category = category,
         totalCount = totalCount,
@@ -190,6 +194,7 @@ object AnimeMapper {
         seasonSourceOrder: Long,
         backgroundUrl: String?,
         backgroundLastModified: Long,
+        downloadNewEpisodes: Boolean,
         totalCount: Long,
         seenCount: Double,
         latestUpload: Long,
@@ -230,6 +235,7 @@ object AnimeMapper {
             seasonSourceOrder,
             backgroundUrl,
             backgroundLastModified,
+            downloadNewEpisodes,
         ),
         totalCount = totalCount,
         seenCount = seenCount.toLong(),

@@ -33,6 +33,7 @@ data class Manga(
     val favoriteModifiedAt: Long?,
     val version: Long,
     val mangaType: MangaType = MangaType.UNKNOWN,
+    val downloadNewChapters: Boolean = true,
 ) : Serializable {
 
     val expectedNextUpdate: Instant?
@@ -128,6 +129,7 @@ data class Manga(
             favoriteModifiedAt = null,
             version = 0L,
             mangaType = MangaType.UNKNOWN,
+            downloadNewChapters = true,
         )
     }
 }

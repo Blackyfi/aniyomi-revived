@@ -180,6 +180,9 @@ class MangaScreen(
             onEditTypeClicked = screenModel::showSetMangaTypeDialog.takeIf {
                 successState.manga.favorite
             },
+            onToggleAutoDownloadClicked = screenModel::toggleAutoDownload.takeIf {
+                successState.manga.favorite
+            },
             onMigrateClicked = {
                 navigator.push(MigrateMangaSearchScreen(successState.manga.id))
             }.takeIf { successState.manga.favorite },

@@ -82,6 +82,7 @@ import tachiyomi.domain.entries.anime.interactor.GetDuplicateLibraryAnime
 import tachiyomi.domain.entries.anime.interactor.SetAnimeEpisodeFlags
 import tachiyomi.domain.entries.anime.interactor.SetAnimeSeasonFlags
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.entries.anime.model.AnimeUpdate
 import tachiyomi.domain.entries.anime.model.NoSeasonsException
 import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.entries.applyFilter
@@ -422,6 +423,16 @@ class AnimeScreenModel(
                     anime.copy(fetchInterval = -interval),
                 )
             ) {
+                val updatedAnime = animeRepository.getAnimeById(anime.id)
+                updateSuccessState { it.copy(anime = updatedAnime) }
+            }
+        }
+    }
+
+    fun toggleAutoDownload() {
+        val anime = successState?.anime ?: return
+        screenModelScope.launchNonCancellable {
+            if (updateAnime.await(AnimeUpdate(id = anime.id, downloadNewEpisodes = !anime.downloadNewEpisodes))) {
                 val updatedAnime = animeRepository.getAnimeById(anime.id)
                 updateSuccessState { it.copy(anime = updatedAnime) }
             }

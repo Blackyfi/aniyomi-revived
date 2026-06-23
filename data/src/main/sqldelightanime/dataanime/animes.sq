@@ -35,7 +35,8 @@ CREATE TABLE animes(
     season_number REAL NOT NULL,
     season_source_order INTEGER NOT NULL,
     background_url TEXT,
-    background_last_modified INTEGER NOT NULL
+    background_last_modified INTEGER NOT NULL,
+    download_new_episodes INTEGER AS Boolean NOT NULL DEFAULT 1
 );
 
 CREATE INDEX animelib_favorite_index ON animes(favorite) WHERE favorite = 1;
@@ -194,7 +195,8 @@ UPDATE animes SET
     season_number = coalesce(:seasonNumber, season_number),
     season_source_order = coalesce(:seasonSourceOrder, season_source_order),
     background_url = coalesce(:backgroundUrl, background_url),
-    background_last_modified = coalesce(:backgroundLastModified, background_last_modified)
+    background_last_modified = coalesce(:backgroundLastModified, background_last_modified),
+    download_new_episodes = coalesce(:downloadNewEpisodes, download_new_episodes)
 WHERE _id = :animeId;
 
 selectLastInsertedRowId:
