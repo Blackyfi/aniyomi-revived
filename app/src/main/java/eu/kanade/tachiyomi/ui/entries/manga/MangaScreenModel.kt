@@ -441,6 +441,16 @@ class MangaScreenModel(
         }
     }
 
+    fun toggleAutoDownload() {
+        val manga = successState?.manga ?: return
+        screenModelScope.launchNonCancellable {
+            if (updateManga.await(MangaUpdate(id = manga.id, downloadNewChapters = !manga.downloadNewChapters))) {
+                val updatedManga = mangaRepository.getMangaById(manga.id)
+                updateSuccessState { it.copy(manga = updatedManga) }
+            }
+        }
+    }
+
     /**
      * Returns true if the manga has any downloads.
      */

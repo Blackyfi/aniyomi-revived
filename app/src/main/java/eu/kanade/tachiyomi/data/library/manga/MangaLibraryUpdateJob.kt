@@ -67,6 +67,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
@@ -95,14 +96,17 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         if (tags.contains(WORK_NAME_AUTO)) {
             // Skip this scheduled run if it falls outside the user's daily update window.
             // The next periodic run will retry; we report success so WorkManager keeps the schedule.
-            if (libraryPreferences.autoUpdateTimeRestricted().get() &&
-                !LibraryPreferences.isWithinUpdateWindow(
-                    libraryPreferences.autoUpdateStartHour().get(),
-                    libraryPreferences.autoUpdateEndHour().get(),
-                    ZonedDateTime.now().hour,
-                )
-            ) {
-                return Result.success()
+            if (libraryPreferences.autoUpdateTimeRestricted().get()) {
+                val zone = runCatching { ZoneId.of(libraryPreferences.autoUpdateTimeZone().get()) }
+                    .getOrDefault(ZoneId.systemDefault())
+                if (!LibraryPreferences.isWithinUpdateWindow(
+                        libraryPreferences.autoUpdateStartHour().get(),
+                        libraryPreferences.autoUpdateEndHour().get(),
+                        ZonedDateTime.now(zone).hour,
+                    )
+                ) {
+                    return Result.success()
+                }
             }
 
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
