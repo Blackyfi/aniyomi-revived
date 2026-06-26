@@ -112,6 +112,7 @@ fun MangaScreen(
 
     // For the multi-source picker (no-op for ordinary sources)
     onSourceSelected: ((String) -> Unit)?,
+    onPickerOpened: () -> Unit = {},
 
     // For cover dialog
     onCoverClicked: () -> Unit,
@@ -172,6 +173,7 @@ fun MangaScreen(
             onContinueReading = onContinueReading,
             onSearch = onSearch,
             onSourceSelected = onSourceSelected,
+            onPickerOpened = onPickerOpened,
             onCoverClicked = onCoverClicked,
             onShareClicked = onShareClicked,
             onDownloadActionClicked = onDownloadActionClicked,
@@ -211,6 +213,7 @@ fun MangaScreen(
             onContinueReading = onContinueReading,
             onSearch = onSearch,
             onSourceSelected = onSourceSelected,
+            onPickerOpened = onPickerOpened,
             onCoverClicked = onCoverClicked,
             onShareClicked = onShareClicked,
             onDownloadActionClicked = onDownloadActionClicked,
@@ -256,6 +259,7 @@ private fun MangaScreenSmallImpl(
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
     onSourceSelected: ((String) -> Unit)?,
+    onPickerOpened: () -> Unit = {},
 
     // For cover dialog
     onCoverClicked: () -> Unit,
@@ -459,6 +463,7 @@ private fun MangaScreenSmallImpl(
                             MangaSourceSelector(
                                 sources = state.availableSources,
                                 onSourceSelected = onSourceSelected,
+                                onPickerOpened = onPickerOpened,
                             )
                         }
                     }
@@ -520,6 +525,7 @@ fun MangaScreenLargeImpl(
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
     onSourceSelected: ((String) -> Unit)?,
+    onPickerOpened: () -> Unit = {},
 
     // For cover dialog
     onCoverClicked: () -> Unit,
@@ -718,6 +724,7 @@ fun MangaScreenLargeImpl(
                                     MangaSourceSelector(
                                         sources = state.availableSources,
                                         onSourceSelected = onSourceSelected,
+                                        onPickerOpened = onPickerOpened,
                                     )
                                 }
                             }

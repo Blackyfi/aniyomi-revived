@@ -173,6 +173,7 @@ fun MangaSourceSelector(
     sources: List<MangaSourceInfo>,
     onSourceSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onPickerOpened: () -> Unit = {},
 ) {
     val current = remember(sources) {
         sources.firstOrNull { it.isEffective } ?: sources.firstOrNull()
@@ -180,7 +181,10 @@ fun MangaSourceSelector(
     var expanded by remember { mutableStateOf(false) }
 
     OutlinedCard(
-        onClick = { expanded = true },
+        onClick = {
+            expanded = true
+            onPickerOpened()
+        },
         modifier = modifier
             .fillMaxWidth()
             .padding(

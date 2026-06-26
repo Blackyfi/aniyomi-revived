@@ -255,24 +255,56 @@ object SettingsLibraryScreen : SearchableSettings {
                     title = stringResource(AYMR.strings.pref_library_update_time_restriction),
                     subtitle = stringResource(AYMR.strings.pref_library_update_time_restriction_summary),
                     enabled = autoUpdateInterval > 0,
+                    onValueChanged = {
+                        // Post to event looper to allow the preference to be updated.
+                        ContextCompat.getMainExecutor(context).execute {
+                            MangaLibraryUpdateJob.setupTask(context)
+                            AnimeLibraryUpdateJob.setupTask(context)
+                        }
+                        true
+                    },
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = libraryPreferences.autoUpdateStartHour(),
                     entries = updateHourEntries,
                     title = stringResource(AYMR.strings.pref_library_update_start_time),
                     enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
+                    onValueChanged = {
+                        // Post to event looper to allow the preference to be updated.
+                        ContextCompat.getMainExecutor(context).execute {
+                            MangaLibraryUpdateJob.setupTask(context)
+                            AnimeLibraryUpdateJob.setupTask(context)
+                        }
+                        true
+                    },
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = libraryPreferences.autoUpdateEndHour(),
                     entries = updateHourEntries,
                     title = stringResource(AYMR.strings.pref_library_update_end_time),
                     enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
+                    onValueChanged = {
+                        // Post to event looper to allow the preference to be updated.
+                        ContextCompat.getMainExecutor(context).execute {
+                            MangaLibraryUpdateJob.setupTask(context)
+                            AnimeLibraryUpdateJob.setupTask(context)
+                        }
+                        true
+                    },
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = libraryPreferences.autoUpdateTimeZone(),
                     entries = timeZoneEntries,
                     title = stringResource(AYMR.strings.pref_library_update_time_zone),
                     enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
+                    onValueChanged = {
+                        // Post to event looper to allow the preference to be updated.
+                        ContextCompat.getMainExecutor(context).execute {
+                            MangaLibraryUpdateJob.setupTask(context)
+                            AnimeLibraryUpdateJob.setupTask(context)
+                        }
+                        true
+                    },
                 ),
                 Preference.PreferenceItem.MultiSelectListPreference(
                     preference = libraryPreferences.autoUpdateDeviceRestrictions(),

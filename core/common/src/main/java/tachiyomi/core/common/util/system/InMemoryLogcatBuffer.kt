@@ -31,7 +31,16 @@ object InMemoryLogcatBuffer : LogcatLogger {
     private val entries = ArrayDeque<Entry>(MAX_ENTRIES)
     private val lock = Any()
 
-    override fun isLoggable(priority: LogPriority): Boolean = true
+    /**
+     * Minimum priority (as [LogPriority.priorityInt]) that is captured. Defaults to
+     * [LogPriority.INFO] so high-frequency DEBUG/VERBOSE logs (e.g. per-page-turn) don't
+     * churn the bounded buffer and evict the errors/warnings the feature exists to keep.
+     * Can be lowered to [LogPriority.VERBOSE] when verbose logging is enabled.
+     */
+    @Volatile
+    var minPriority: Int = LogPriority.INFO.priorityInt
+
+    override fun isLoggable(priority: LogPriority): Boolean = priority.priorityInt >= minPriority
 
     override fun log(priority: LogPriority, tag: String, message: String) {
         val safeMessage = if (message.length > MAX_MESSAGE_LENGTH) {

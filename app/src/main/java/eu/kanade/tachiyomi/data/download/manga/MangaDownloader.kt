@@ -49,7 +49,6 @@ import okio.buffer
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
-import tachiyomi.core.common.util.lang.launchNow
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
@@ -129,7 +128,7 @@ class MangaDownloader(
     var isPaused: Boolean = false
 
     init {
-        launchNow {
+        scope.launch {
             val chapters = async { store.restore() }
             addAllToQueue(chapters.await())
         }
@@ -374,10 +373,12 @@ class MangaDownloader(
         }
         if (pending.isEmpty()) return
         // Freeze concurrently so this never noticeably delays a source switch, even with a long
-        // queue. supervisorScope isolates per-download failures and still awaits them all.
+        // queue, but bound the fan-out so we don't burst the source being switched away from.
+        // supervisorScope isolates per-download failures and still awaits them all.
+        val freezeDispatcher = Dispatchers.IO.limitedParallelism(3)
         supervisorScope {
             pending.forEach { download ->
-                launch {
+                launch(freezeDispatcher) {
                     try {
                         val pages = download.source.getPageList(download.chapter.toSChapter())
                         if (pages.isNotEmpty()) {

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +50,10 @@ import eu.kanade.tachiyomi.util.system.createFileInCacheDir
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.InMemoryLogcatBuffer
 import tachiyomi.i18n.MR
@@ -66,6 +71,7 @@ class DebugLogsScreen : Screen() {
         val context = LocalContext.current
         val navigator = LocalNavigator.currentOrThrow
         val model = rememberScreenModel { DebugLogsScreenModel() }
+        val scope = rememberCoroutineScope()
 
         val filtered = remember(model.entries, model.query, model.minPriority) {
             model.entries.filter { entry ->
@@ -112,7 +118,7 @@ class DebugLogsScreen : Screen() {
                                         if (filtered.isEmpty()) {
                                             context.toast(MR.strings.info_debug_logs_empty)
                                         } else {
-                                            shareLogs(context, filtered)
+                                            shareLogs(scope, context, filtered)
                                         }
                                     },
                                 ),
@@ -249,14 +255,26 @@ class DebugLogsScreen : Screen() {
         LogPriority.VERBOSE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     }
 
-    private fun shareLogs(context: Context, entries: List<InMemoryLogcatBuffer.Entry>) {
-        try {
-            val file = context.createFileInCacheDir("aniyomi_debug_logs.txt")
-            file.writeText(buildLogText(context, entries))
-            val uri = file.getUriCompat(context)
-            context.startActivity(uri.toShareIntent(context, "text/plain"))
-        } catch (e: Throwable) {
-            context.toast("Failed to share logs")
+    private fun shareLogs(
+        scope: CoroutineScope,
+        context: Context,
+        entries: List<InMemoryLogcatBuffer.Entry>,
+    ) {
+        // The file write and debug-info gathering (PackageManager/WebView lookups) are blocking,
+        // so do them off the main thread and only fire the share intent back on the main thread.
+        scope.launch(Dispatchers.IO) {
+            try {
+                val file = context.createFileInCacheDir("aniyomi_debug_logs.txt")
+                file.writeText(buildLogText(context, entries))
+                val uri = file.getUriCompat(context)
+                withContext(Dispatchers.Main) {
+                    context.startActivity(uri.toShareIntent(context, "text/plain"))
+                }
+            } catch (e: Throwable) {
+                withContext(Dispatchers.Main) {
+                    context.toast("Failed to share logs")
+                }
+            }
         }
     }
 

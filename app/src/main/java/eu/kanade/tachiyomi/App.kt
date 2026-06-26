@@ -106,40 +106,44 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         Injekt.importModule(SYDomainModule())
         // SY <--
 
-        ProcessLifecycleOwner.get().lifecycleScope.launchIO { setupNotificationChannels() }
-
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
 
-        // Show notification to disable Incognito Mode when it's enabled
-        basePreferences.incognitoMode().changes()
-            .onEach { enabled ->
-                if (enabled) {
-                    disableIncognitoReceiver.register()
-                    notify(
-                        Notifications.ID_INCOGNITO_MODE,
-                        Notifications.CHANNEL_INCOGNITO_MODE,
-                    ) {
-                        setContentTitle(stringResource(MR.strings.pref_incognito_mode))
-                        setContentText(stringResource(MR.strings.notification_incognito_text))
-                        setSmallIcon(R.drawable.ic_glasses_24dp)
-                        setOngoing(true)
+        scope.launchIO {
+            // Create notification channels first so notifications posted by the incognito
+            // flow below (which can emit on subscription) aren't silently dropped on API 26+.
+            setupNotificationChannels()
 
-                        val pendingIntent = PendingIntent.getBroadcast(
-                            this@App,
-                            0,
-                            Intent(ACTION_DISABLE_INCOGNITO_MODE),
-                            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
-                        )
-                        setContentIntent(pendingIntent)
+            // Show notification to disable Incognito Mode when it's enabled
+            basePreferences.incognitoMode().changes()
+                .onEach { enabled ->
+                    if (enabled) {
+                        disableIncognitoReceiver.register()
+                        notify(
+                            Notifications.ID_INCOGNITO_MODE,
+                            Notifications.CHANNEL_INCOGNITO_MODE,
+                        ) {
+                            setContentTitle(stringResource(MR.strings.pref_incognito_mode))
+                            setContentText(stringResource(MR.strings.notification_incognito_text))
+                            setSmallIcon(R.drawable.ic_glasses_24dp)
+                            setOngoing(true)
+
+                            val pendingIntent = PendingIntent.getBroadcast(
+                                this@App,
+                                0,
+                                Intent(ACTION_DISABLE_INCOGNITO_MODE),
+                                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
+                            )
+                            setContentIntent(pendingIntent)
+                        }
+                    } else {
+                        disableIncognitoReceiver.unregister()
+                        cancelNotification(Notifications.ID_INCOGNITO_MODE)
                     }
-                } else {
-                    disableIncognitoReceiver.unregister()
-                    cancelNotification(Notifications.ID_INCOGNITO_MODE)
                 }
-            }
-            .launchIn(ProcessLifecycleOwner.get().lifecycleScope)
+                .launchIn(this)
+        }
 
         basePreferences.hardwareBitmapThreshold().let { preference ->
             if (!preference.isSet()) preference.set(GLUtil.DEVICE_TEXTURE_LIMIT)
@@ -164,9 +168,15 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         // "Debug logs" screen) so errors are available even without verbose logging or
         // `adb`. The Android logcat logger is only added when verbose logging is on.
         if (!LogcatLogger.isInstalled) {
+            val verboseLogging = networkPreferences.verboseLogging().get()
+            // Power users with verbose logging on still get full DEBUG/VERBOSE capture; otherwise
+            // the buffer keeps its INFO default so high-frequency debug logs don't evict errors.
+            if (verboseLogging) {
+                InMemoryLogcatBuffer.minPriority = LogPriority.VERBOSE.priorityInt
+            }
             val loggers = buildList<LogcatLogger> {
                 add(InMemoryLogcatBuffer)
-                if (networkPreferences.verboseLogging().get()) {
+                if (verboseLogging) {
                     add(AndroidLogcatLogger(LogPriority.VERBOSE))
                 }
             }
