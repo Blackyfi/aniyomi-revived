@@ -696,8 +696,10 @@ class AnimeLibraryScreenModel(
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
 
-            // Fetch each selected anime's category set once, then derive both sets in memory.
-            val categorySets = animeList.map { getCategories.await(it.id).toSet() }
+            // Fetch all selected animes' category sets in a single batched query, then derive both
+            // sets in memory (preserving selection order).
+            val categoryMap = getCategories.await(animeList.map { it.id })
+            val categorySets = animeList.map { categoryMap[it.id].orEmpty().toSet() }
             // Get indexes of the common categories to preselect.
             val common = getCommonCategories(categorySets)
             // Get indexes of the mix categories to preselect.

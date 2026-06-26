@@ -33,7 +33,11 @@ import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -44,6 +48,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import logcat.LogPriority
 import tachiyomi.core.common.preference.CheckboxState
@@ -377,41 +382,107 @@ open class MangaLibraryScreenModel(
      * Get the categories and all its manga from the database.
      */
     private fun getLibraryFlow(): Flow<MangaLibraryMap> {
-        val libraryMangasFlow = combine(
-            getLibraryManga.subscribe(),
-            getLibraryItemPreferencesFlow(),
-            downloadCache.changes,
-        ) { libraryMangaList, prefs, _ ->
-            libraryMangaList
-                .map { libraryManga ->
-                    // Display mode based on user preference: take it from global library setting or category
-                    MangaLibraryItem(
-                        libraryManga,
-                        downloadCount = if (prefs.downloadBadge) {
-                            downloadManager.getDownloadCount(libraryManga.manga).toLong()
-                        } else {
-                            0
-                        },
-                        unreadCount = if (prefs.unreadBadge) libraryManga.unreadCount else 0,
-                        isLocal = if (prefs.localBadge) libraryManga.manga.isLocal() else false,
-                        sourceLanguage = if (prefs.languageBadge) {
-                            sourceManager.getOrStub(libraryManga.manga.source).lang
-                        } else {
-                            ""
-                        },
+        // Shared across the Manga and Manhwa tabs — see [sharedLibraryFlow].
+        return sharedLibraryFlow(
+            getLibraryManga = getLibraryManga,
+            getCategories = getCategories,
+            downloadCache = downloadCache,
+            downloadManager = downloadManager,
+            sourceManager = sourceManager,
+            itemPreferencesFlow = getLibraryItemPreferencesFlow(),
+        )
+    }
+
+    companion object {
+        /**
+         * The full-library flow — including the per-entry download-count computation — is identical
+         * for the Manga and Manhwa tabs; only the downstream [MangaType] filter (in [applyFilters])
+         * differs. The two tabs are separate screen-model instances, so without sharing they would
+         * each run this heavy DB + download-count pipeline independently. This builds it once and
+         * shares it across both instances. [SharingStarted.WhileSubscribed] stops the upstream — and,
+         * via `replayExpirationMillis = 0`, releases the cached library map — shortly after both tabs
+         * stop collecting, so nothing is retained while the library is closed. It captures only
+         * app-singleton dependencies (never a screen-model instance/state).
+         */
+        private val sharedLibraryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        @Volatile
+        private var sharedLibraryFlow: Flow<MangaLibraryMap>? = null
+
+        private fun sharedLibraryFlow(
+            getLibraryManga: GetLibraryManga,
+            getCategories: GetVisibleMangaCategories,
+            downloadCache: MangaDownloadCache,
+            downloadManager: MangaDownloadManager,
+            sourceManager: MangaSourceManager,
+            itemPreferencesFlow: Flow<ItemPreferences>,
+        ): Flow<MangaLibraryMap> {
+            sharedLibraryFlow?.let { return it }
+            return synchronized(this) {
+                sharedLibraryFlow ?: buildLibraryFlow(
+                    getLibraryManga,
+                    getCategories,
+                    downloadCache,
+                    downloadManager,
+                    sourceManager,
+                    itemPreferencesFlow,
+                )
+                    .shareIn(
+                        scope = sharedLibraryScope,
+                        started = SharingStarted.WhileSubscribed(
+                            stopTimeoutMillis = 5_000,
+                            replayExpirationMillis = 0,
+                        ),
+                        replay = 1,
                     )
-                }
-                .groupBy { it.libraryManga.category }
+                    .also { sharedLibraryFlow = it }
+            }
         }
 
-        return combine(getCategories.subscribe(), libraryMangasFlow) { categories, libraryManga ->
-            val displayCategories = if (libraryManga.isNotEmpty() && !libraryManga.containsKey(0)) {
-                categories.fastFilterNot { it.isSystemCategory }
-            } else {
-                categories
+        private fun buildLibraryFlow(
+            getLibraryManga: GetLibraryManga,
+            getCategories: GetVisibleMangaCategories,
+            downloadCache: MangaDownloadCache,
+            downloadManager: MangaDownloadManager,
+            sourceManager: MangaSourceManager,
+            itemPreferencesFlow: Flow<ItemPreferences>,
+        ): Flow<MangaLibraryMap> {
+            val libraryMangasFlow = combine(
+                getLibraryManga.subscribe(),
+                itemPreferencesFlow,
+                downloadCache.changes,
+            ) { libraryMangaList, prefs, _ ->
+                libraryMangaList
+                    .map { libraryManga ->
+                        // Display mode based on user preference: take it from global library setting or category
+                        MangaLibraryItem(
+                            libraryManga,
+                            downloadCount = if (prefs.downloadBadge) {
+                                downloadManager.getDownloadCount(libraryManga.manga).toLong()
+                            } else {
+                                0
+                            },
+                            unreadCount = if (prefs.unreadBadge) libraryManga.unreadCount else 0,
+                            isLocal = if (prefs.localBadge) libraryManga.manga.isLocal() else false,
+                            sourceLanguage = if (prefs.languageBadge) {
+                                sourceManager.getOrStub(libraryManga.manga.source).lang
+                            } else {
+                                ""
+                            },
+                        )
+                    }
+                    .groupBy { it.libraryManga.category }
             }
 
-            displayCategories.associateWith { libraryManga[it.id].orEmpty() }
+            return combine(getCategories.subscribe(), libraryMangasFlow) { categories, libraryManga ->
+                val displayCategories = if (libraryManga.isNotEmpty() && !libraryManga.containsKey(0)) {
+                    categories.fastFilterNot { it.isSystemCategory }
+                } else {
+                    categories
+                }
+
+                displayCategories.associateWith { libraryManga[it.id].orEmpty() }
+            }
         }
     }
 
@@ -696,8 +767,10 @@ open class MangaLibraryScreenModel(
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
 
-            // Fetch each selected manga's category set once, then derive both sets in memory.
-            val categorySets = mangaList.map { getCategories.await(it.id).toSet() }
+            // Fetch all selected mangas' category sets in a single batched query, then derive both
+            // sets in memory (preserving selection order).
+            val categoryMap = getCategories.await(mangaList.map { it.id })
+            val categorySets = mangaList.map { categoryMap[it.id].orEmpty().toSet() }
             // Get indexes of the common categories to preselect.
             val common = getCommonCategories(categorySets)
             // Get indexes of the mix categories to preselect.
