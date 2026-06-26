@@ -31,8 +31,8 @@ object MangaTypeDetector {
     )
 
     fun detect(genres: List<String>?, sourceLang: String?): MangaType {
-        val normalizedGenres = genres.orEmpty().map { it.lowercase().trim() }
-        val matchesGenre = normalizedGenres.any { genre ->
+        val matchesGenre = genres.orEmpty().any { rawGenre ->
+            val genre = rawGenre.lowercase().trim()
             MANHWA_GENRE_KEYWORDS.any { keyword -> genre.contains(keyword) }
         }
         if (matchesGenre) return MangaType.MANHWA

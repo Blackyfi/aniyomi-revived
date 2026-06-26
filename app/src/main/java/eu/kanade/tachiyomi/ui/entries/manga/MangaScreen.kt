@@ -170,6 +170,7 @@ class MangaScreen(
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onSourceSelected = { key: String -> screenModel.switchSource(key) }
                 .takeIf { successState.source is MultiSourceCatalogSource },
+            onPickerOpened = screenModel::warmSourcePrefetch,
             onCoverClicked = screenModel::showCoverDialog,
             onShareClicked = { shareManga(context, screenModel.manga, screenModel.source) }.takeIf { isHttpSource },
             onDownloadActionClicked = screenModel::runDownloadAction.takeIf { !successState.source.isLocalOrStub() },
