@@ -777,7 +777,7 @@ class AnimeDownloader(
         download: AnimeDownload,
         tmpDir: UniFile,
     ): Boolean {
-        val downloadedVideo = tmpDir.listFiles().orEmpty().filterNot { it.extension == ".tmp" }
+        val downloadedVideo = tmpDir.listFiles().orEmpty().filterNot { it.extension == "tmp" }
         return downloadedVideo.size == 1
     }
 
@@ -796,7 +796,7 @@ class AnimeDownloader(
         dirname: String,
     ) {
         // Ensure that the episode folder has the full video
-        val downloadedVideo = tmpDir.listFiles().orEmpty().filterNot { it.extension == ".tmp" }
+        val downloadedVideo = tmpDir.listFiles().orEmpty().filterNot { it.extension == "tmp" }
 
         download.status = if (downloadedVideo.size == 1) {
             // Only rename the directory if it's downloaded
