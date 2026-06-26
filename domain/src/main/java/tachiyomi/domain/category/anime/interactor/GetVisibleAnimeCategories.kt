@@ -22,4 +22,8 @@ class GetVisibleAnimeCategories(
     suspend fun await(animeId: Long): List<Category> {
         return categoryRepository.getVisibleCategoriesByAnimeId(animeId)
     }
+
+    suspend fun await(animeIds: List<Long>): Map<Long, List<Category>> {
+        return categoryRepository.getVisibleCategoriesByAnimeIds(animeIds)
+    }
 }

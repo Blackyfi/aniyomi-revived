@@ -20,6 +20,8 @@ interface MangaCategoryRepository {
 
     suspend fun getVisibleCategoriesByMangaId(mangaId: Long): List<Category>
 
+    suspend fun getVisibleCategoriesByMangaIds(mangaIds: List<Long>): Map<Long, List<Category>>
+
     fun getCategoriesByMangaIdAsFlow(mangaId: Long): Flow<List<Category>>
 
     fun getVisibleCategoriesByMangaIdAsFlow(mangaId: Long): Flow<List<Category>>
