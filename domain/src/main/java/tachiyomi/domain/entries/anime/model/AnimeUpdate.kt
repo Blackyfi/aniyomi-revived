@@ -32,6 +32,7 @@ data class AnimeUpdate(
     val seasonFlags: Long? = null,
     val seasonNumber: Double? = null,
     val seasonSourceOrder: Long? = null,
+    val downloadNewEpisodes: Boolean? = null,
 )
 
 fun Anime.toAnimeUpdate(): AnimeUpdate {
@@ -64,5 +65,6 @@ fun Anime.toAnimeUpdate(): AnimeUpdate {
         seasonFlags = seasonFlags,
         seasonNumber = seasonNumber,
         seasonSourceOrder = seasonSourceOrder,
+        downloadNewEpisodes = downloadNewEpisodes,
     )
 }

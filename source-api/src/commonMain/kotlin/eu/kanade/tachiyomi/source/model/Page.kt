@@ -12,13 +12,15 @@ open class Page(
     val index: Int,
     val url: String = "",
     var imageUrl: String? = null,
+    // ABI-CRITICAL: `uri` MUST stay as the 4th primary-constructor parameter to match the
+    // extensions-lib (eu.kanade.tachiyomi.source.model.Page is `Page(index, url, imageUrl, uri)`)
+    // and upstream Aniyomi/Mihon. Extensions call `Page(index, imageUrl = ...)` with `uri`
+    // defaulted, which the compiler lowers to the synthetic default-args constructor
+    // `<init>(I, String, String, Uri, I, DefaultConstructorMarker)`. Removing `uri` from here
+    // changes that signature and causes NoSuchMethodError at runtime in every extension that
+    // builds a Page with default args (kemono/coomer and ~all others). Do NOT move it out again.
+    @Transient var uri: Uri? = null,
 ) : ProgressListener {
-
-    // Kept out of the primary constructor so the generated constructor stays binary-compatible
-    // with extensions compiled against upstream's 3-arg Page. Deprecated but can't be deleted
-    // due to extensions that still reference it.
-    @Transient
-    var uri: Uri? = null
 
     val number: Int
         get() = index + 1

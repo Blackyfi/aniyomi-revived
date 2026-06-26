@@ -172,6 +172,7 @@ class MangaRepositoryImpl(
                     version = value.version,
                     isSyncing = 0,
                     mangaType = value.mangaType?.id,
+                    downloadNewChapters = value.downloadNewChapters,
                 )
             }
         }

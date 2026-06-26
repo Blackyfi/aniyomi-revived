@@ -49,6 +49,7 @@ import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.time.ZoneId
 
 object SettingsLibraryScreen : SearchableSettings {
 
@@ -170,6 +171,9 @@ object SettingsLibraryScreen : SearchableSettings {
         val updateHourEntries = remember {
             (0..23).associateWith { "%02d:00".format(it) }.toImmutableMap()
         }
+        val timeZoneEntries = remember {
+            ZoneId.getAvailableZoneIds().sorted().associateWith { it }.toImmutableMap()
+        }
 
         val animeAutoUpdateCategoriesPref = libraryPreferences.animeUpdateCategories()
         val animeAutoUpdateCategoriesExcludePref =
@@ -262,6 +266,12 @@ object SettingsLibraryScreen : SearchableSettings {
                     preference = libraryPreferences.autoUpdateEndHour(),
                     entries = updateHourEntries,
                     title = stringResource(AYMR.strings.pref_library_update_end_time),
+                    enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = libraryPreferences.autoUpdateTimeZone(),
+                    entries = timeZoneEntries,
+                    title = stringResource(AYMR.strings.pref_library_update_time_zone),
                     enabled = autoUpdateInterval > 0 && autoUpdateTimeRestricted,
                 ),
                 Preference.PreferenceItem.MultiSelectListPreference(

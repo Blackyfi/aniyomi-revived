@@ -50,6 +50,7 @@ class FilterChaptersForDownload(
      * @return `true` if chapters of the manga should be downloaded
      */
     private suspend fun Manga.shouldDownloadNewChapters(): Boolean {
+        if (!downloadNewChapters) return false
         if (!favorite) return false
         val categories = getCategories.await(id).map { it.id }.ifEmpty { listOf(DEFAULT_CATEGORY_ID) }
         val includedCategories = downloadPreferences.downloadNewChapterCategories().get().map { it.toLong() }

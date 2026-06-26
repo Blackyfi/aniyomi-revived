@@ -1,0 +1,3 @@
+-- Add download_new_chapters to let users disable automatic chapter downloads per manga.
+-- Existing entries default to 1 (auto-download active) and keep their previous behaviour.
+ALTER TABLE mangas ADD COLUMN download_new_chapters INTEGER AS Boolean NOT NULL DEFAULT 1;

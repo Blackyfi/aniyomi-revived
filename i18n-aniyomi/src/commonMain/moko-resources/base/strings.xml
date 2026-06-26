@@ -22,9 +22,10 @@
     <string name="pref_update_only_completely_read">Skip entries with unseen episode(s)/unread chapter(s)</string>
     <string name="pref_library_update_show_tab_badge">Show unseen/unread count on Updates icon</string>
     <string name="pref_library_update_time_restriction">Only update during a time window</string>
-    <string name="pref_library_update_time_restriction_summary">Skip scheduled updates that fall outside the chosen hours (device local time)</string>
+    <string name="pref_library_update_time_restriction_summary">Skip scheduled updates that fall outside the chosen hours</string>
     <string name="pref_library_update_start_time">Window start</string>
     <string name="pref_library_update_end_time">Window end</string>
+    <string name="pref_library_update_time_zone">Time zone</string>
     <string name="pref_category_delete_chapters">Delete chapters/episodes</string>
     <string name="pref_remove_after_marked_as_read">After manually marked as read/watched</string>
     <string name="pref_remove_after_read">After reading/watching automatically delete</string>
@@ -386,6 +387,8 @@
     <string name="label_anime_library">Anime</string>
     <!-- Manga/Manhwa classification -->
     <string name="action_set_manga_type">Set type</string>
+    <string name="action_disable_auto_download">Disable auto-download</string>
+    <string name="action_enable_auto_download">Enable auto-download</string>
     <string name="manga_type_automatic">Automatic</string>
     <string name="manga_type_manga">Manga</string>
     <string name="manga_type_manhwa">Manhwa</string>
@@ -568,7 +571,12 @@
     <string name="resmush">resmush.it</string>
     <string name="bandwidth_data_saver_server">Bandwidth Hero Proxy Server</string>
     <string name="data_saver_server_summary">Put Bandwidth Hero Proxy server url here</string>
-    <string name="download_slots_info">Will only download concurrently from self-hosted or unmetered sources</string>
+    <string name="download_slots_info">Downloads up to the selected number of items at once, spread across sources for politeness. Each metered source is limited to a few simultaneous downloads; unmetered (self-hosted) sources are unrestricted.</string>
+    <string name="action_test_download_speed">Test download speed</string>
+    <string name="download_speed_test_running">Testing download speed…</string>
+    <string name="download_speed_test_result">Measured speed: %1$s\nRecommended download slots: %2$d</string>
+    <string name="download_speed_test_failed">Download speed test failed</string>
+    <string name="action_apply_recommendation">Apply</string>
     <string name="unseen">Unseen</string>
     <string name="label_manga_extension_repos">Manga extension repos</string>
     <string name="label_anime_extension_repos">Anime extension repos</string>

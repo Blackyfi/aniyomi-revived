@@ -209,26 +209,55 @@ class MangaDownloader(
         if (isRunning) return
 
         downloaderJob = scope.launch {
-            val activeDownloadsFlow = queueState.transformLatest { queue ->
-                while (true) {
-                    val activeDownloads = queue.asSequence()
-                        .filter {
-                            it.status.value <= MangaDownload.State.DOWNLOADING.value
-                        } // Ignore completed downloads, leave them in the queue
-                        .groupBy { it.source }
-                        .toList().take(5) // Concurrently download from 5 different sources
-                        .map { (_, downloads) -> downloads.first() }
-                    emit(activeDownloads)
+            // Re-evaluate the active set whenever the queue OR the configured slot count changes,
+            // so a slot-count change takes effect live without restarting the queue. changes()
+            // emits the current value on start; distinctUntilChanged guards against thrash.
+            val activeDownloadsFlow = combine(
+                queueState,
+                downloadPreferences.numberOfDownloads().changes(),
+            ) { queue, slots -> queue to slots }
+                .transformLatest { (queue, slots) ->
+                    while (true) {
+                        // Group not-yet-finished downloads by source, then apply a per-source
+                        // politeness cap: unmetered sources are uncapped, metered ones are limited
+                        // to PER_SOURCE_LIMIT to avoid hammering a single IP.
+                        val cappedBySource = queue.asSequence()
+                            .filter {
+                                it.status.value <= MangaDownload.State.DOWNLOADING.value
+                            } // Ignore completed downloads, leave them in the queue
+                            .groupBy { it.source }
+                            .map { (source, downloads) ->
+                                if (source is UnmeteredSource) downloads else downloads.take(PER_SOURCE_LIMIT)
+                            }
+                        // Round-robin across sources: round 0 takes one download per source
+                        // (preserving cross-source parallelism + politeness), filling up to
+                        // `slots` downloads in total.
+                        val activeDownloads = buildList {
+                            var round = 0
+                            while (size < slots) {
+                                var added = false
+                                for (downloads in cappedBySource) {
+                                    if (round < downloads.size) {
+                                        add(downloads[round])
+                                        added = true
+                                        if (size >= slots) break
+                                    }
+                                }
+                                if (!added) break
+                                round++
+                            }
+                        }
+                        emit(activeDownloads)
 
-                    if (activeDownloads.isEmpty()) break
-                    // Suspend until a download enters the ERROR state
-                    val activeDownloadsErroredFlow =
-                        combine(activeDownloads.map(MangaDownload::statusFlow)) { states ->
-                            states.contains(MangaDownload.State.ERROR)
-                        }.filter { it }
-                    activeDownloadsErroredFlow.first()
-                }
-            }.distinctUntilChanged()
+                        if (activeDownloads.isEmpty()) break
+                        // Suspend until a download enters the ERROR state
+                        val activeDownloadsErroredFlow =
+                            combine(activeDownloads.map(MangaDownload::statusFlow)) { states ->
+                                states.contains(MangaDownload.State.ERROR)
+                            }.filter { it }
+                        activeDownloadsErroredFlow.first()
+                    }
+                }.distinctUntilChanged()
 
             // Use supervisorScope to cancel child jobs when the downloader job is cancelled
             supervisorScope {
@@ -425,7 +454,8 @@ class MangaDownloader(
             download.status = MangaDownload.State.DOWNLOADING
 
             // Start downloading images, consider we can have downloaded images already
-            // Concurrently do 2 pages at a time
+            // Concurrently do 2 pages at a time. This page-level concurrency is independent of the
+            // configurable download-slot count (which governs concurrent chapters/sources).
             pageList.asFlow()
                 .flatMapMerge(concurrency = 2) { page ->
                     flow {
@@ -807,6 +837,10 @@ class MangaDownloader(
         const val WARNING_NOTIF_TIMEOUT_MS = 30_000L
         const val CHAPTERS_PER_SOURCE_QUEUE_WARNING_THRESHOLD = 15
         private const val DOWNLOADS_QUEUED_WARNING_THRESHOLD = 30
+
+        // Max concurrent downloads from a single metered source (politeness / IP-ban mitigation).
+        // Unmetered sources are exempt from this cap.
+        private const val PER_SOURCE_LIMIT = 2
     }
 }
 

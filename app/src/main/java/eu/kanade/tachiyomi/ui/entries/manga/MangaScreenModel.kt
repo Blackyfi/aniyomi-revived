@@ -441,6 +441,16 @@ class MangaScreenModel(
         }
     }
 
+    fun toggleAutoDownload() {
+        val manga = successState?.manga ?: return
+        screenModelScope.launchNonCancellable {
+            if (updateManga.await(MangaUpdate(id = manga.id, downloadNewChapters = !manga.downloadNewChapters))) {
+                val updatedManga = mangaRepository.getMangaById(manga.id)
+                updateSuccessState { it.copy(manga = updatedManga) }
+            }
+        }
+    }
+
     /**
      * Returns true if the manga has any downloads.
      */
@@ -632,9 +642,18 @@ class MangaScreenModel(
             }
         } catch (e: Throwable) {
             val message = if (e is NoChaptersException) {
+                // An empty chapter list is otherwise silent; log it so "no chapters"
+                // failures are diagnosable from the in-app Debug logs.
+                logcat(LogPriority.WARN) {
+                    "Source '${state.source.name}' (id=${state.source.id}) returned no chapters for " +
+                        "'${state.manga.title}' (url=${state.manga.url})"
+                }
                 context.stringResource(MR.strings.no_chapters_error)
             } else {
-                logcat(LogPriority.ERROR, e)
+                logcat(LogPriority.ERROR, e) {
+                    "Failed to fetch chapter list for '${state.manga.title}' (url=${state.manga.url}) " +
+                        "from source '${state.source.name}' (id=${state.source.id})"
+                }
                 with(context) { e.formattedMessage }
             }
 
