@@ -105,6 +105,15 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                         ZonedDateTime.now(zone).hour,
                     )
                 ) {
+                    // The periodic schedule fires at a fixed phase that may never coincide with the
+                    // window for long intervals/narrow windows. Schedule a one-time catch-up run at
+                    // the next window opening so a skip always guarantees a later in-window update.
+                    val delayMillis = LibraryPreferences.millisUntilNextWindowStart(
+                        libraryPreferences.autoUpdateStartHour().get(),
+                        libraryPreferences.autoUpdateEndHour().get(),
+                        ZonedDateTime.now(zone),
+                    )
+                    scheduleCatchup(context, delayMillis)
                     return Result.success()
                 }
             }
@@ -438,6 +447,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     companion object {
         private const val TAG = "LibraryUpdate"
         private const val WORK_NAME_AUTO = "LibraryUpdate-auto"
+        private const val WORK_NAME_AUTO_CATCHUP = "LibraryUpdate-autoCatchup"
         private const val WORK_NAME_MANUAL = "LibraryUpdate-manual"
 
         private const val ERROR_LOG_HELP_URL = "https://aniyomi.org/help/guides/troubleshooting"
@@ -452,6 +462,48 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             context.workManager.cancelAllWorkByTag(TAG)
         }
 
+        private fun buildConstraints(preferences: LibraryPreferences): Constraints {
+            val restrictions = preferences.autoUpdateDeviceRestrictions().get()
+            val networkType = if (DEVICE_NETWORK_NOT_METERED in restrictions) {
+                NetworkType.UNMETERED
+            } else {
+                NetworkType.CONNECTED
+            }
+            val networkRequestBuilder = NetworkRequest.Builder()
+            if (DEVICE_ONLY_ON_WIFI in restrictions) {
+                networkRequestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            }
+            if (DEVICE_NETWORK_NOT_METERED in restrictions) {
+                networkRequestBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            }
+            return Constraints.Builder()
+                // 'networkRequest' only applies to Android 9+, otherwise 'networkType' is used
+                .setRequiredNetworkRequest(networkRequestBuilder.build(), networkType)
+                .setRequiresCharging(DEVICE_CHARGING in restrictions)
+                .setRequiresBatteryNotLow(true)
+                .build()
+        }
+
+        /**
+         * Enqueues a single pending one-time catch-up run [delayMillis] from now, so an auto run
+         * skipped for being outside the update window is guaranteed to retry once the window opens.
+         * Repeated skips collapse to one pending catch-up via [ExistingWorkPolicy.REPLACE].
+         */
+        private fun scheduleCatchup(context: Context, delayMillis: Long) {
+            val preferences = Injekt.get<LibraryPreferences>()
+            val request = OneTimeWorkRequestBuilder<MangaLibraryUpdateJob>()
+                .addTag(TAG)
+                .addTag(WORK_NAME_AUTO)
+                .setConstraints(buildConstraints(preferences))
+                .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+                .build()
+            context.workManager.enqueueUniqueWork(
+                WORK_NAME_AUTO_CATCHUP,
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
+
         fun setupTask(
             context: Context,
             prefInterval: Int? = null,
@@ -459,25 +511,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             val preferences = Injekt.get<LibraryPreferences>()
             val interval = prefInterval ?: preferences.autoUpdateInterval().get()
             if (interval > 0) {
-                val restrictions = preferences.autoUpdateDeviceRestrictions().get()
-                val networkType = if (DEVICE_NETWORK_NOT_METERED in restrictions) {
-                    NetworkType.UNMETERED
-                } else {
-                    NetworkType.CONNECTED
-                }
-                val networkRequestBuilder = NetworkRequest.Builder()
-                if (DEVICE_ONLY_ON_WIFI in restrictions) {
-                    networkRequestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                }
-                if (DEVICE_NETWORK_NOT_METERED in restrictions) {
-                    networkRequestBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-                }
-                val constraints = Constraints.Builder()
-                    // 'networkRequest' only applies to Android 9+, otherwise 'networkType' is used
-                    .setRequiredNetworkRequest(networkRequestBuilder.build(), networkType)
-                    .setRequiresCharging(DEVICE_CHARGING in restrictions)
-                    .setRequiresBatteryNotLow(true)
-                    .build()
+                val constraints = buildConstraints(preferences)
 
                 val request = PeriodicWorkRequestBuilder<MangaLibraryUpdateJob>(
                     interval.toLong(),

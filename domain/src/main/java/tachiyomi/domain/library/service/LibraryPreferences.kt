@@ -10,7 +10,10 @@ import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.library.anime.model.AnimeLibrarySort
 import tachiyomi.domain.library.manga.model.MangaLibrarySort
 import tachiyomi.domain.library.model.LibraryDisplayMode
+import java.time.Duration
 import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 
 class LibraryPreferences(
     private val preferenceStore: PreferenceStore,
@@ -404,9 +407,9 @@ class LibraryPreferences(
 
     companion object {
         /**
-         * Returns whether [hour] (0-23) falls inside the inclusive auto-update window bounded by
-         * [startHour] and [endHour]. Supports windows that wrap past midnight (e.g. 22 -> 6).
-         * When both bounds are equal the window covers the whole day.
+         * Returns whether [hour] (0-23) falls inside the auto-update window bounded by [startHour]
+         * (start-inclusive) and [endHour] (end-exclusive). Supports windows that wrap past midnight
+         * (e.g. 22 -> 6). When both bounds are equal the window covers the whole day.
          */
         fun isWithinUpdateWindow(startHour: Int, endHour: Int, hour: Int): Boolean {
             return when {
@@ -414,6 +417,22 @@ class LibraryPreferences(
                 startHour < endHour -> hour in startHour until endHour
                 else -> hour >= startHour || hour < endHour
             }
+        }
+
+        /**
+         * Returns the number of milliseconds from [now] until the next moment the auto-update
+         * window opens. Returns 0 when [now] is already inside the window or when the window covers
+         * the whole day ([startHour] == [endHour]). Otherwise returns the delay until the hour next
+         * reaches [startHour] in [now]'s zone (today if [now] is before [startHour], else tomorrow),
+         * aligned to the top of that hour.
+         */
+        fun millisUntilNextWindowStart(startHour: Int, endHour: Int, now: ZonedDateTime): Long {
+            if (startHour == endHour) return 0L
+            if (isWithinUpdateWindow(startHour, endHour, now.hour)) return 0L
+            val nextStart = now.truncatedTo(ChronoUnit.HOURS)
+                .withHour(startHour)
+                .let { if (now.hour < startHour) it else it.plusDays(1) }
+            return Duration.between(now, nextStart).toMillis()
         }
 
         const val DEVICE_ONLY_ON_WIFI = "wifi"
