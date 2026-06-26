@@ -45,12 +45,14 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import logcat.LogPriority
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.util.lang.compareToWithCollator
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
 import tachiyomi.core.common.util.lang.withIOContext
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.manga.interactor.GetVisibleMangaCategories
 import tachiyomi.domain.category.manga.interactor.SetMangaCategories
 import tachiyomi.domain.category.model.Category
@@ -728,9 +730,12 @@ open class MangaLibraryScreenModel(
      */
     fun setMangaTypeForSelection(mangaList: List<Manga>, type: MangaType) {
         screenModelScope.launchNonCancellable {
-            updateManga.awaitAll(
+            val success = updateManga.awaitAll(
                 mangaList.map { MangaUpdate(id = it.id, mangaType = type) },
             )
+            if (!success) {
+                logcat(LogPriority.ERROR) { "Failed to bulk-update manga type for ${mangaList.size} entries" }
+            }
         }
     }
 
