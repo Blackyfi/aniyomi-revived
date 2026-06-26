@@ -18,8 +18,10 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
+import logcat.LogPriority
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
+import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.concurrent.PriorityBlockingQueue
@@ -203,6 +205,11 @@ internal class HttpPageLoader(
             page.status = Page.State.ERROR
             if (e is CancellationException) {
                 throw e
+            }
+            // Image-load failures were otherwise silent; log so reader "loads
+            // forever"/broken-image issues are diagnosable from the Debug logs.
+            logcat(LogPriority.ERROR, e) {
+                "Failed to load page ${page.number} (imageUrl=${page.imageUrl}) from source ${source.name}"
             }
         }
     }

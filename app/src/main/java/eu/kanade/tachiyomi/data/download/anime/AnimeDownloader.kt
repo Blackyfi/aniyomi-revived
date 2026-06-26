@@ -193,29 +193,60 @@ class AnimeDownloader(
         if (isRunning) return
 
         downloaderJob = scope.launch {
-            val activeDownloadsFlow = queueState.transformLatest { queue ->
-                while (true) {
-                    val activeDownloads = queue.asSequence()
-                        .filter {
-                            it.status.value <= AnimeDownload.State.DOWNLOADING.value
-                        } // Ignore completed downloads, leave them in the queue
-                        .groupBy { it.source }
-                        .toList().take(3) // Concurrently download from 5 different sources
-                        .map { (_, downloads) -> downloads.first() }
-                    emit(activeDownloads)
+            // Re-evaluate the active set whenever the queue OR the configured slot count changes,
+            // so a slot-count change takes effect live without restarting the queue. changes()
+            // emits the current value on start; distinctUntilChanged guards against thrash.
+            val activeDownloadsFlow = combine(
+                queueState,
+                preferences.numberOfDownloads().changes(),
+            ) { queue, slots -> queue to slots }
+                .transformLatest { (queue, slots) ->
+                    while (true) {
+                        // Group not-yet-finished downloads by source, then apply a per-source
+                        // politeness cap. Each episode spawns a heavy FFmpegKit session, so metered
+                        // anime sources stay at PER_SOURCE_LIMIT (1) to avoid running multiple ffmpeg
+                        // sessions against the same host; cross-source parallelism still scales up to
+                        // `slots`. Unmetered sources are uncapped.
+                        val cappedBySource = queue.asSequence()
+                            .filter {
+                                it.status.value <= AnimeDownload.State.DOWNLOADING.value
+                            } // Ignore completed downloads, leave them in the queue
+                            .groupBy { it.source }
+                            .map { (source, downloads) ->
+                                if (source is UnmeteredSource) downloads else downloads.take(PER_SOURCE_LIMIT)
+                            }
+                        // Round-robin across sources: round 0 takes one download per source
+                        // (preserving cross-source parallelism + politeness), filling up to
+                        // `slots` downloads in total.
+                        val activeDownloads = buildList {
+                            var round = 0
+                            while (size < slots) {
+                                var added = false
+                                for (downloads in cappedBySource) {
+                                    if (round < downloads.size) {
+                                        add(downloads[round])
+                                        added = true
+                                        if (size >= slots) break
+                                    }
+                                }
+                                if (!added) break
+                                round++
+                            }
+                        }
+                        emit(activeDownloads)
 
-                    if (activeDownloads.isEmpty()) break
+                        if (activeDownloads.isEmpty()) break
 
-                    // Suspend until a download enters the ERROR state
-                    val activeDownloadsErroredFlow =
-                        combine(activeDownloads.map(AnimeDownload::statusFlow)) { states ->
-                            states.contains(AnimeDownload.State.ERROR)
-                        }.filter { it }
-                    activeDownloadsErroredFlow.first()
-                }
+                        // Suspend until a download enters the ERROR state
+                        val activeDownloadsErroredFlow =
+                            combine(activeDownloads.map(AnimeDownload::statusFlow)) { states ->
+                                states.contains(AnimeDownload.State.ERROR)
+                            }.filter { it }
+                        activeDownloadsErroredFlow.first()
+                    }
 
-                if (areAllAnimeDownloadsFinished()) stop()
-            }.distinctUntilChanged()
+                    if (areAllAnimeDownloadsFinished()) stop()
+                }.distinctUntilChanged()
 
             // Use supervisorScope to cancel child jobs when the downloader job is cancelled
             supervisorScope {
@@ -872,6 +903,12 @@ class AnimeDownloader(
         const val WARNING_NOTIF_TIMEOUT_MS = 30_000L
         const val EPISODES_PER_SOURCE_QUEUE_WARNING_THRESHOLD = 10
         private const val DOWNLOADS_QUEUED_WARNING_THRESHOLD = 20
+
+        // Max concurrent downloads from a single metered source. Kept at 1 for anime because each
+        // episode spawns a heavy FFmpegKit session; metered sources stay 1-per-source and
+        // cross-source parallelism scales up to the configured slot count. Unmetered sources are
+        // exempt from this cap.
+        private const val PER_SOURCE_LIMIT = 1
     }
 }
 

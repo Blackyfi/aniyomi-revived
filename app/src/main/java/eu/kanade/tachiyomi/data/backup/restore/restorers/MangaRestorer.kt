@@ -131,6 +131,7 @@ class MangaRestorer(
                 isSyncing = 1,
                 // Not stored in backups; keep the existing/auto-detected value.
                 mangaType = null,
+                downloadNewChapters = null,
             )
         }
         return manga

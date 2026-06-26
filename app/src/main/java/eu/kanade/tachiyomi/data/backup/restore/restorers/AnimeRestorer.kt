@@ -166,6 +166,8 @@ class AnimeRestorer(
                 seasonSourceOrder = anime.seasonSourceOrder,
                 backgroundUrl = anime.backgroundUrl,
                 backgroundLastModified = anime.backgroundLastModified,
+                // Not stored in backups; keep the existing/default value.
+                downloadNewEpisodes = null,
             )
         }
         return anime

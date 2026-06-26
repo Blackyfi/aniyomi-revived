@@ -122,6 +122,7 @@ fun MangaScreen(
     onEditCategoryClicked: (() -> Unit)?,
     onEditFetchIntervalClicked: (() -> Unit)?,
     onEditTypeClicked: (() -> Unit)?,
+    onToggleAutoDownloadClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
 
     // For bottom action menu
@@ -177,6 +178,7 @@ fun MangaScreen(
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onEditTypeClicked = onEditTypeClicked,
+            onToggleAutoDownloadClicked = onToggleAutoDownloadClicked,
             onMigrateClicked = onMigrateClicked,
             onMultiBookmarkClicked = onMultiBookmarkClicked,
             onMultiMarkAsReadClicked = onMultiMarkAsReadClicked,
@@ -215,6 +217,7 @@ fun MangaScreen(
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onEditTypeClicked = onEditTypeClicked,
+            onToggleAutoDownloadClicked = onToggleAutoDownloadClicked,
             onMigrateClicked = onMigrateClicked,
             onMultiBookmarkClicked = onMultiBookmarkClicked,
             onMultiMarkAsReadClicked = onMultiMarkAsReadClicked,
@@ -263,6 +266,7 @@ private fun MangaScreenSmallImpl(
     onEditCategoryClicked: (() -> Unit)?,
     onEditIntervalClicked: (() -> Unit)?,
     onEditTypeClicked: (() -> Unit)?,
+    onToggleAutoDownloadClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     onSettingsClicked: (() -> Unit)?,
 
@@ -326,6 +330,8 @@ private fun MangaScreenSmallImpl(
                 onClickDownload = onDownloadActionClicked,
                 onClickEditCategory = onEditCategoryClicked,
                 onClickEditType = onEditTypeClicked,
+                onClickToggleAutoDownload = onToggleAutoDownloadClicked,
+                autoDownloadEnabled = state.manga.downloadNewChapters,
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onClickSettings = onSettingsClicked,
@@ -524,6 +530,7 @@ fun MangaScreenLargeImpl(
     onEditCategoryClicked: (() -> Unit)?,
     onEditIntervalClicked: (() -> Unit)?,
     onEditTypeClicked: (() -> Unit)?,
+    onToggleAutoDownloadClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     onSettingsClicked: (() -> Unit)?,
 
@@ -580,6 +587,8 @@ fun MangaScreenLargeImpl(
                 onClickDownload = onDownloadActionClicked,
                 onClickEditCategory = onEditCategoryClicked,
                 onClickEditType = onEditTypeClicked,
+                onClickToggleAutoDownload = onToggleAutoDownloadClicked,
+                autoDownloadEnabled = state.manga.downloadNewChapters,
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onCancelActionMode = { onAllChapterSelected(false) },

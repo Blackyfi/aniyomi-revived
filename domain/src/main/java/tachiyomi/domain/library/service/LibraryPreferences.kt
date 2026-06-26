@@ -10,6 +10,7 @@ import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.library.anime.model.AnimeLibrarySort
 import tachiyomi.domain.library.manga.model.MangaLibrarySort
 import tachiyomi.domain.library.model.LibraryDisplayMode
+import java.time.ZoneId
 
 class LibraryPreferences(
     private val preferenceStore: PreferenceStore,
@@ -39,10 +40,11 @@ class LibraryPreferences(
     fun lastUpdatedTimestamp() = preferenceStore.getLong(Preference.appStateKey("library_update_last_timestamp"), 0L)
     fun autoUpdateInterval() = preferenceStore.getInt("pref_library_update_interval_key", 0)
 
-    // Restrict automatic updates to a daily time window, expressed in the device's local hours.
+    // Restrict automatic updates to a daily time window, expressed in the hours of the selected time zone.
     fun autoUpdateTimeRestricted() = preferenceStore.getBoolean("library_update_time_restricted", false)
     fun autoUpdateStartHour() = preferenceStore.getInt("library_update_start_hour", 6)
     fun autoUpdateEndHour() = preferenceStore.getInt("library_update_end_hour", 22)
+    fun autoUpdateTimeZone() = preferenceStore.getString("library_update_time_zone", ZoneId.systemDefault().id)
 
     fun autoUpdateDeviceRestrictions() = preferenceStore.getStringSet(
         "library_update_restriction",
@@ -402,9 +404,9 @@ class LibraryPreferences(
 
     companion object {
         /**
-         * Returns whether [hour] (0-23, device local time) falls inside the inclusive auto-update
-         * window bounded by [startHour] and [endHour]. Supports windows that wrap past midnight
-         * (e.g. 22 -> 6). When both bounds are equal the window covers the whole day.
+         * Returns whether [hour] (0-23) falls inside the inclusive auto-update window bounded by
+         * [startHour] and [endHour]. Supports windows that wrap past midnight (e.g. 22 -> 6).
+         * When both bounds are equal the window covers the whole day.
          */
         fun isWithinUpdateWindow(startHour: Int, endHour: Int, hour: Int): Boolean {
             return when {

@@ -216,6 +216,7 @@ class AnimeRepositoryImpl(
                     seasonFlags = value.seasonFlags,
                     seasonNumber = value.seasonNumber,
                     seasonSourceOrder = value.seasonSourceOrder,
+                    downloadNewEpisodes = value.downloadNewEpisodes,
                 )
             }
         }

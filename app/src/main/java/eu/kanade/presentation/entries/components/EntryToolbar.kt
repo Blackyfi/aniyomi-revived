@@ -39,6 +39,8 @@ fun EntryToolbar(
     onClickRefresh: () -> Unit,
     onClickMigrate: (() -> Unit)?,
     onClickSettings: (() -> Unit)?,
+    onClickToggleAutoDownload: (() -> Unit)? = null,
+    autoDownloadEnabled: Boolean = true,
     // Manga only
     onClickEditType: (() -> Unit)? = null,
     // Anime only
@@ -144,6 +146,20 @@ fun EntryToolbar(
                             AppBar.OverflowAction(
                                 title = stringResource(AYMR.strings.action_set_manga_type),
                                 onClick = onClickEditType,
+                            ),
+                        )
+                    }
+                    if (onClickToggleAutoDownload != null) {
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(
+                                    if (autoDownloadEnabled) {
+                                        AYMR.strings.action_disable_auto_download
+                                    } else {
+                                        AYMR.strings.action_enable_auto_download
+                                    },
+                                ),
+                                onClick = onClickToggleAutoDownload,
                             ),
                         )
                     }

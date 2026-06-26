@@ -42,6 +42,7 @@ data class Anime(
     val seasonFlags: Long,
     val seasonNumber: Double,
     val seasonSourceOrder: Long,
+    val downloadNewEpisodes: Boolean = true,
 ) : Serializable {
 
     val expectedNextUpdate: Instant?
@@ -340,6 +341,7 @@ data class Anime(
             seasonFlags = 0L,
             seasonNumber = -1.0,
             seasonSourceOrder = 0L,
+            downloadNewEpisodes = true,
         )
     }
 }

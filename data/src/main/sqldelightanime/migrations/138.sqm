@@ -1,0 +1,3 @@
+-- Add download_new_episodes to let users disable automatic episode downloads per anime.
+-- Existing entries default to 1 (auto-download active) and keep their previous behaviour.
+ALTER TABLE animes ADD COLUMN download_new_episodes INTEGER AS Boolean NOT NULL DEFAULT 1;

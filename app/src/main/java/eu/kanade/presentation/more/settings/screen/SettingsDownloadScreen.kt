@@ -16,21 +16,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.util.fastMap
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.category.visualName
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.widget.TriStateListDialog
+import eu.kanade.tachiyomi.data.download.DownloadSpeedTester
+import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.launch
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
 import tachiyomi.domain.category.manga.interactor.GetMangaCategories
 import tachiyomi.domain.category.model.Category
@@ -75,6 +80,22 @@ object SettingsDownloadScreen : SearchableSettings {
                 },
             )
         }
+
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val speedTester = remember { DownloadSpeedTester() }
+        var isSpeedTesting by remember { mutableStateOf(false) }
+        var speedTestResult by remember { mutableStateOf<DownloadSpeedTester.Result?>(null) }
+        speedTestResult?.let { result ->
+            DownloadSpeedTestResultDialog(
+                result = result,
+                onDismissRequest = { speedTestResult = null },
+                onConfirm = {
+                    downloadPreferences.numberOfDownloads().set(result.recommendedSlots)
+                    speedTestResult = null
+                },
+            )
+        }
         return listOf(
             Preference.PreferenceItem.SwitchPreference(
                 preference = downloadPreferences.downloadOnlyOverWifi(),
@@ -102,6 +123,27 @@ object SettingsDownloadScreen : SearchableSettings {
                 preference = downloadPreferences.numberOfDownloads(),
                 entries = (1..5).associateWith { it.toString() }.toImmutableMap(),
                 title = stringResource(AYMR.strings.pref_download_slots),
+            ),
+            Preference.PreferenceItem.TextPreference(
+                title = stringResource(AYMR.strings.action_test_download_speed),
+                subtitle = if (isSpeedTesting) {
+                    stringResource(AYMR.strings.download_speed_test_running)
+                } else {
+                    null
+                },
+                enabled = !isSpeedTesting,
+                onClick = {
+                    isSpeedTesting = true
+                    scope.launch {
+                        try {
+                            speedTestResult = speedTester.test()
+                        } catch (e: Throwable) {
+                            context.toast(AYMR.strings.download_speed_test_failed)
+                        } finally {
+                            isSpeedTesting = false
+                        }
+                    }
+                },
             ),
             Preference.PreferenceItem.InfoPreference(stringResource(AYMR.strings.download_slots_info)),
             getDeleteChaptersGroup(
@@ -434,6 +476,38 @@ object SettingsDownloadScreen : SearchableSettings {
                     },
                 ) {
                     Text(text = stringResource(MR.strings.action_ok))
+                }
+            },
+        )
+    }
+
+    @Composable
+    private fun DownloadSpeedTestResultDialog(
+        result: DownloadSpeedTester.Result,
+        onDismissRequest: () -> Unit,
+        onConfirm: () -> Unit,
+    ) {
+        val speed = "%.1f MB/s".format(result.mbps)
+        AlertDialog(
+            onDismissRequest = onDismissRequest,
+            title = { Text(stringResource(AYMR.strings.action_test_download_speed)) },
+            text = {
+                Text(
+                    text = stringResource(
+                        AYMR.strings.download_speed_test_result,
+                        speed,
+                        result.recommendedSlots,
+                    ),
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissRequest) {
+                    Text(text = stringResource(MR.strings.action_cancel))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onConfirm) {
+                    Text(text = stringResource(AYMR.strings.action_apply_recommendation))
                 }
             },
         )
