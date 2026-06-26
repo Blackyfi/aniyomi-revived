@@ -43,6 +43,17 @@ class AnimeCategoryRepositoryImpl(
         }
     }
 
+    override suspend fun getVisibleCategoriesByAnimeIds(
+        animeIds: List<Long>,
+    ): Map<Long, List<Category>> {
+        if (animeIds.isEmpty()) return emptyMap()
+        return handler.awaitList {
+            categoriesQueries.getVisibleCategoriesByAnimeIds(animeIds) { animeId, id, name, order, flags, hidden ->
+                animeId to mapCategory(id, name, order, flags, hidden)
+            }
+        }.groupBy({ it.first }, { it.second })
+    }
+
     override fun getCategoriesByAnimeIdAsFlow(animeId: Long): Flow<List<Category>> {
         return handler.subscribeToList {
             categoriesQueries.getCategoriesByAnimeId(animeId, ::mapCategory)

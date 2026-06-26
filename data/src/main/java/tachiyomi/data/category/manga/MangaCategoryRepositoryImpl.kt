@@ -43,6 +43,17 @@ class MangaCategoryRepositoryImpl(
         }
     }
 
+    override suspend fun getVisibleCategoriesByMangaIds(
+        mangaIds: List<Long>,
+    ): Map<Long, List<Category>> {
+        if (mangaIds.isEmpty()) return emptyMap()
+        return handler.awaitList {
+            categoriesQueries.getVisibleCategoriesByMangaIds(mangaIds) { mangaId, id, name, order, flags, hidden ->
+                mangaId to mapCategory(id, name, order, flags, hidden)
+            }
+        }.groupBy({ it.first }, { it.second })
+    }
+
     override fun getCategoriesByMangaIdAsFlow(mangaId: Long): Flow<List<Category>> {
         return handler.subscribeToList {
             categoriesQueries.getCategoriesByMangaId(mangaId, ::mapCategory)
