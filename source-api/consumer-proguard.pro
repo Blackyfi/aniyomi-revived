@@ -12,3 +12,9 @@
 -keep class eu.kanade.tachiyomi.animesource.** extends eu.kanade.tachiyomi.animesource.AnimeSource { public protected *; }
 
 -keep,allowoptimization class eu.kanade.tachiyomi.util.JsoupExtensionsKt { public protected *; }
+
+# Torrent support: host-provided classes that torrent extensions call by name at
+# runtime (loaded from the app via ChildFirstPathClassLoader). Without an explicit
+# keep, R8 renames/strips them and extensions crash with NoClassDefFoundError /
+# NoSuchMethodError.
+-keep class eu.kanade.tachiyomi.torrentutils.** { *; }
