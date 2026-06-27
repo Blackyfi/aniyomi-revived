@@ -52,6 +52,12 @@ dependencies {
     // FFmpeg-kit
     implementation(aniyomilibs.ffmpeg.kit)
 
+    // Dependency injection (used by the torrent server client)
+    implementation(libs.injekt)
+
+    // Torrent streaming engine (self-hosted Go TorrServer fork)
+    implementation(aniyomilibs.torrentserver)
+
     // Tests
     testImplementation(libs.bundles.test)
 }
