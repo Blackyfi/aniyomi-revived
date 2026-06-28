@@ -280,6 +280,12 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Root/adb-only headless extension test harness; not exported, no real-world surface. -->
+        <service
+            android:name=".data.headless.HeadlessTestService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
