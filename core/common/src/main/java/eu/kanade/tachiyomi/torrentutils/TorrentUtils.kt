@@ -5,9 +5,9 @@ import eu.kanade.tachiyomi.torrentutils.model.DeadTorrentException
 import eu.kanade.tachiyomi.torrentutils.model.TorrentFile
 import eu.kanade.tachiyomi.torrentutils.model.TorrentInfo
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
 import java.net.SocketTimeoutException
-import java.net.URI
 
 object TorrentUtils {
     fun getTorrentInfo(
@@ -60,8 +60,12 @@ object TorrentUtils {
         require(lower.startsWith("http://") || lower.startsWith("https://")) {
             "Unsupported torrent link scheme"
         }
-        val host = runCatching { URI(url).host }.getOrNull().orEmpty()
-        require(host.isNotEmpty() && !isPrivateHost(host)) {
+        // Parse with OkHttp's lenient HttpUrl rather than java.net.URI: torrent download links
+        // routinely carry spaces and `[ ]` in the filename portion, which make URI() throw and
+        // would otherwise reject a perfectly public host. Only refuse links we can positively
+        // resolve to a private/loopback host.
+        val host = url.trim().toHttpUrlOrNull()?.host
+        require(!host.isNullOrEmpty() && !isPrivateHost(host)) {
             "Refusing torrent link to non-public host"
         }
     }
