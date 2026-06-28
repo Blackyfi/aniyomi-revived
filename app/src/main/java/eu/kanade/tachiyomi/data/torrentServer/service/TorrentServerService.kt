@@ -10,6 +10,7 @@ import android.os.IBinder
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
+import eu.kanade.tachiyomi.torrentServer.TorrentServerPreferences
 import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
 import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.notificationBuilder
@@ -23,6 +24,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import uy.kohesive.injekt.injectLazy
 
 /**
  * Foreground [Service] that hosts the native Go torrent server (torrServer).
@@ -34,6 +36,7 @@ import tachiyomi.i18n.aniyomi.AYMR
 class TorrentServerService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val preferences: TorrentServerPreferences by injectLazy()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -43,7 +46,9 @@ class TorrentServerService : Service() {
             ACTION_START -> {
                 startForegroundNotification()
                 startServer()
-                return START_STICKY
+                // Not sticky: the server is started per-playback and stopped on player teardown;
+                // it must not be silently resurrected (with no notification) after the app is killed.
+                return START_NOT_STICKY
             }
             ACTION_STOP -> {
                 stopServer()
@@ -58,12 +63,14 @@ class TorrentServerService : Service() {
         serviceScope.launch {
             try {
                 if (TorrentServerApi.echo() == "") {
+                    val port = preferences.port().get().toString()
                     logcat(LogPriority.INFO) {
-                        "[Torrent] starting native server, data dir=${applicationContext.filesDir.absolutePath}"
+                        "[Torrent] starting native server on port $port, data dir=${applicationContext.filesDir.absolutePath}"
                     }
-                    torrServer.TorrServer.startTorrentServer(applicationContext.filesDir.absolutePath)
+                    torrServer.TorrServer.startTorrentServerOnPort(applicationContext.filesDir.absolutePath, port)
                     if (wait(10)) {
                         TorrentServerUtils.setTrackersList()
+                        TorrentServerUtils.applyServerSettings()
                         isRunning = true
                         logcat(LogPriority.INFO) { "[Torrent] native server is up (${TorrentServerUtils.hostUrl})" }
                     } else {
