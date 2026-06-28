@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.GetApp
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Refresh
@@ -54,6 +55,7 @@ import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.ui.browse.anime.extension.AnimeExtensionUiModel
 import eu.kanade.tachiyomi.ui.browse.anime.extension.AnimeExtensionsScreenModel
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.launchRequestPackageInstallsPermission
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR
@@ -170,19 +172,45 @@ private fun AnimeExtensionContent(
                 when (header) {
                     is AnimeExtensionUiModel.Header.Resource -> {
                         val action: @Composable RowScope.() -> Unit =
-                            if (header.textRes == MR.strings.ext_updates_pending) {
-                                {
-                                    Button(onClick = { onClickUpdateAll() }) {
-                                        Text(
-                                            text = stringResource(MR.strings.ext_update_all),
-                                            style = LocalTextStyle.current.copy(
-                                                color = MaterialTheme.colorScheme.onPrimary,
-                                            ),
-                                        )
+                            when (header.textRes) {
+                                MR.strings.ext_updates_pending -> {
+                                    {
+                                        Button(onClick = { onClickUpdateAll() }) {
+                                            Text(
+                                                text = stringResource(MR.strings.ext_update_all),
+                                                style = LocalTextStyle.current.copy(
+                                                    color = MaterialTheme.colorScheme.onPrimary,
+                                                ),
+                                            )
+                                        }
                                     }
                                 }
-                            } else {
-                                {}
+                                MR.strings.ext_installed -> {
+                                    {
+                                        val installed = items
+                                            .map { it.extension }
+                                            .filterIsInstance<AnimeExtension.Installed>()
+                                        if (installed.isNotEmpty()) {
+                                            val copyLabel = stringResource(MR.strings.ext_copy_installed)
+                                            IconButton(
+                                                onClick = {
+                                                    context.copyToClipboard(
+                                                        copyLabel,
+                                                        installed.toClipboardText(),
+                                                    )
+                                                },
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.ContentCopy,
+                                                    contentDescription = copyLabel,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    {}
+                                }
                             }
                         ExtensionHeader(
                             textRes = header.textRes,
@@ -482,3 +510,7 @@ private fun AnimeExtensionItemActions(
         }
     }
 }
+
+private fun List<AnimeExtension.Installed>.toClipboardText(): String =
+    sortedBy { it.name.lowercase() }
+        .joinToString("\n") { "${it.name} (${it.lang}) v${it.versionName}" }
