@@ -97,7 +97,13 @@ class EpisodeLoader {
                 }
             } catch (e: Throwable) {
                 if (e !is CancellationException) {
-                    ExtensionErrorStorage.record(source.id, source.name, "Load videos", e)
+                    ExtensionErrorStorage.record(
+                        source.id,
+                        source.name,
+                        "Load videos",
+                        e,
+                        detail = episode.name,
+                    )
                 }
                 throw e
             }
@@ -207,7 +213,13 @@ class EpisodeLoader {
                     throw e
                 }
 
-                ExtensionErrorStorage.record(source.id, source.name, "Load videos", e)
+                ExtensionErrorStorage.record(
+                    source.id,
+                    source.name,
+                    "Load videos",
+                    e,
+                    detail = hoster.hosterName,
+                )
                 HosterState.Error(hoster.hosterName)
             }
         }

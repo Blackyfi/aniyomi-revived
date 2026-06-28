@@ -610,7 +610,13 @@ class AnimeScreenModel(
             val message = if (e is NoEpisodesException) {
                 context.stringResource(AYMR.strings.no_episodes_error)
             } else {
-                ExtensionErrorStorage.record(state.source.id, state.source.name, "Load episodes", e)
+                ExtensionErrorStorage.record(
+                    state.source.id,
+                    state.source.name,
+                    "Load episodes",
+                    e,
+                    detail = state.anime.title,
+                )
                 logcat(LogPriority.ERROR, e)
                 with(context) { e.formattedMessage }
             }

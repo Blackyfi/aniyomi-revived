@@ -657,7 +657,13 @@ class MangaScreenModel(
                 }
                 context.stringResource(MR.strings.no_chapters_error)
             } else {
-                ExtensionErrorStorage.record(state.source.id, state.source.name, "Load chapters", e)
+                ExtensionErrorStorage.record(
+                    state.source.id,
+                    state.source.name,
+                    "Load chapters",
+                    e,
+                    detail = state.manga.title,
+                )
                 logcat(LogPriority.ERROR, e) {
                     "Failed to fetch chapter list for '${state.manga.title}' (url=${state.manga.url}) " +
                         "from source '${state.source.name}' (id=${state.source.id})"

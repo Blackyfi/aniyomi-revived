@@ -157,6 +157,13 @@ class ExtensionErrorLogScreen : Screen() {
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.error,
                         )
+                        if (entry.detail.isNotBlank()) {
+                            Text(
+                                text = entry.detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Text(
                             text = FULL_FORMAT.format(Date(entry.timeMillis)),
                             style = MaterialTheme.typography.labelSmall,
@@ -232,6 +239,7 @@ class ExtensionErrorLogScreen : Screen() {
     private fun buildEntryText(entry: ExtensionErrorEntry): String = buildString {
         appendLine("${FULL_FORMAT.format(Date(entry.timeMillis))}  [${entry.sourceName} #${entry.sourceId}]")
         appendLine("Operation: ${entry.operation}")
+        if (entry.detail.isNotBlank()) appendLine("Detail: ${entry.detail}")
         appendLine("Error: ${entry.message}")
         appendLine()
         append(entry.stackTrace)

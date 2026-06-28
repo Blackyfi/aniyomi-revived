@@ -18,6 +18,8 @@ data class ExtensionErrorEntry(
     val sourceName: String,
     /** Human-readable operation that failed, e.g. "Load episodes". */
     val operation: String,
+    /** Optional context for *where* it happened, e.g. the entry title or search query. */
+    val detail: String = "",
     val message: String,
     val stackTrace: String,
 )
@@ -58,7 +60,13 @@ object ExtensionErrorStorage {
      * Records an extension failure. Never throws — it is safe to call from inside any catch block
      * (a failure here must never mask the original error).
      */
-    fun record(sourceId: Long, sourceName: String, operation: String, throwable: Throwable) {
+    fun record(
+        sourceId: Long,
+        sourceName: String,
+        operation: String,
+        throwable: Throwable,
+        detail: String = "",
+    ) {
         runCatching {
             val entry = ExtensionErrorEntry(
                 id = UUID.randomUUID().toString(),
@@ -66,6 +74,7 @@ object ExtensionErrorStorage {
                 sourceId = sourceId,
                 sourceName = sourceName,
                 operation = operation,
+                detail = detail,
                 message = throwable.message?.takeIf { it.isNotBlank() }
                     ?: throwable::class.simpleName.orEmpty(),
                 stackTrace = throwable.stackTraceToString().take(MAX_STACKTRACE_LENGTH),
