@@ -600,4 +600,27 @@
     <string name="pref_download_fillermarked_items">Allow downloading of fillermarked episodes</string>
     <string name="show_episode_previews">Episode thumbnails</string>
     <string name="show_episode_summaries">Episode summaries</string>
+
+    <!-- Torrent settings -->
+    <string name="pref_category_torrent">Torrent</string>
+    <string name="pref_torrent_settings_summary">Server port, trackers and storage</string>
+    <string name="pref_category_torrent_server">Server</string>
+    <string name="pref_category_torrent_storage">Storage</string>
+    <string name="pref_torrent_port">Server port</string>
+    <string name="pref_torrent_trackers">Trackers</string>
+    <string name="pref_torrent_trackers_summary">One tracker URL per line</string>
+    <string name="pref_torrent_cache_size">Cache size</string>
+    <string name="pref_torrent_download_dir">Download directory</string>
+    <string name="pref_torrent_download_dir_summary">Absolute path used to store torrent data. Leave blank to use internal storage.</string>
+    <string name="pref_torrent_download_dir_internal">Internal storage</string>
+    <string name="pref_torrent_clear_cache">Clear torrent cache</string>
+    <string name="pref_torrent_clear_cache_summary">Delete downloaded and cached torrent data</string>
+    <string name="torrent_cache_cleared">Torrent cache cleared</string>
+    <string name="torrent_cache_clear_error">Could not clear torrent cache</string>
+    <string name="pref_torrent_enable_seeding">Enable seeding</string>
+    <string name="pref_torrent_enable_seeding_summary">Keep uploading to peers after a download finishes</string>
+    <string name="pref_torrent_server_info">Changes apply the next time the torrent server starts.</string>
+    <string name="channel_torrent_server">Torrent server</string>
+    <string name="torrent_server_is_running">Torrent server is running</string>
+    <string name="action_stop_torrent_server">Stop</string>
 </resources>

@@ -67,6 +67,7 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.torrentServer.service.TorrentServerService
 import eu.kanade.tachiyomi.databinding.PlayerLayoutBinding
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -146,6 +147,9 @@ class PlayerActivity : BaseActivity() {
     }
 
     companion object {
+        /** Seconds to wait for the local torrent server to become reachable before giving up. */
+        private const val TORRENT_SERVER_WAIT_SECONDS = 10
+
         fun newIntent(
             context: Context,
             animeId: Long?,
@@ -310,7 +314,40 @@ class PlayerActivity : BaseActivity() {
         MPVLib.removeObserver(playerObserver)
         player.destroy()
 
+        // Tear down the local torrent server if we started it for this playback session.
+        if (torrentServerStarted) {
+            TorrentServerService.stop(this)
+            torrentServerStarted = false
+        }
+
         super.onDestroy()
+    }
+
+    /**
+     * Tracks whether [ensureTorrentServerRunning] started the local torrent server so it can be
+     * stopped again in [onDestroy].
+     */
+    private var torrentServerStarted = false
+
+    /**
+     * Ensures the local torrent server is running and reachable.
+     *
+     * Blocking (polls [TorrentServerService.wait]); must be called from a background thread.
+     *
+     * @return true if the server responded within the timeout, false otherwise.
+     */
+    fun ensureTorrentServerRunning(): Boolean {
+        if (!TorrentServerService.isRunning) {
+            logcat(LogPriority.INFO) { "[Torrent] player requesting torrent server start" }
+            TorrentServerService.start(this)
+        }
+        val ready = TorrentServerService.wait(TORRENT_SERVER_WAIT_SECONDS)
+        if (ready) {
+            torrentServerStarted = true
+        } else {
+            logcat(LogPriority.ERROR) { "[Torrent] torrent server not reachable after ${TORRENT_SERVER_WAIT_SECONDS}s" }
+        }
+        return ready
     }
 
     override fun onPause() {

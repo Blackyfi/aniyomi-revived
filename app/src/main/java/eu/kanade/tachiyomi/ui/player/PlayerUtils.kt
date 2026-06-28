@@ -46,6 +46,28 @@ internal fun Uri.resolveUri(context: Context): String? {
     return filepath
 }
 
+/**
+ * Returns true if the given [url] points to a torrent that must be played through the local
+ * torrent server (a `magnet:` link, a magnet-style `xt=urn:btih:` hash, or a `.torrent` file).
+ *
+ * Note: an already-resolved `http://<ip>:8090/stream/...` link is intentionally NOT matched,
+ * so resolving is idempotent and never re-uploads an already-streaming torrent.
+ */
+internal fun isTorrentVideoUrl(url: String): Boolean {
+    return url.startsWith("magnet:") ||
+        url.contains("xt=urn:btih:") ||
+        url.substringBefore('?').endsWith(".torrent")
+}
+
+/**
+ * Parses the file index encoded by the extension as the `index=<n>` query param of a torrent
+ * [url] (e.g. `magnet:?...&index=2`). Defaults to 0 when absent or malformed.
+ */
+internal fun parseTorrentFileIndex(url: String): Int {
+    if (!url.contains("index=")) return 0
+    return url.substringAfter("index=").substringBefore('&').toIntOrNull() ?: 0
+}
+
 internal fun Uri.getFileName(context: Context): String? {
     return context.contentResolver.query(this, null, null, null, null)?.use { cursor ->
         val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
