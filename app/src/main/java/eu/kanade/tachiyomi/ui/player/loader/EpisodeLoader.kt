@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
+import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import kotlinx.coroutines.CancellationException
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
@@ -84,14 +85,21 @@ class EpisodeLoader {
          * @param source the online source of the episode.
          */
         private suspend fun getHostersOnHttp(episode: Episode, source: AnimeHttpSource): List<Hoster> {
-            // TODO(1.6): Remove else block when dropping support for ext lib <1.6
-            return if (checkHasHosters(source)) {
-                source.getHosterList(episode.toSEpisode())
-                    .let { source.run { it.sortHosters() } }
-            } else {
-                source.getVideoList(episode.toSEpisode())
-                    .let { source.run { it.sortVideos() } }
-                    .toHosterList()
+            return try {
+                // TODO(1.6): Remove else block when dropping support for ext lib <1.6
+                if (checkHasHosters(source)) {
+                    source.getHosterList(episode.toSEpisode())
+                        .let { source.run { it.sortHosters() } }
+                } else {
+                    source.getVideoList(episode.toSEpisode())
+                        .let { source.run { it.sortVideos() } }
+                        .toHosterList()
+                }
+            } catch (e: Throwable) {
+                if (e !is CancellationException) {
+                    ExtensionErrorStorage.record(source.id, source.name, "Load videos", e)
+                }
+                throw e
             }
         }
 
@@ -199,6 +207,7 @@ class EpisodeLoader {
                     throw e
                 }
 
+                ExtensionErrorStorage.record(source.id, source.name, "Load videos", e)
                 HosterState.Error(hoster.hosterName)
             }
         }
