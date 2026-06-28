@@ -14,5 +14,5 @@ compose-constraintlayout = { module = "androidx.constraintlayout:constraintlayou
 ffmpeg-kit = { module = "com.github.jmir1:ffmpeg-kit", version.ref = "ffmpeg-kit" }
 mediasession = { module = "androidx.media:media", version.ref = "media" }
 seeker = { module = "io.github.2307vivek:seeker", version.ref = "seeker" }
-torrentserver = { module = "com.github.Blackyfi:torrentserver-revived", version = "v0.1.2" }
+torrentserver = { module = "com.github.Blackyfi:torrentserver-revived", version = "v0.2.0" }
 truetypeparser = { module = "io.github.yubyf:truetypeparser-light", version.ref = "truetypeparser" }

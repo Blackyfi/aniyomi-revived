@@ -1457,7 +1457,8 @@ class PlayerViewModel @JvmOverloads constructor(
     private suspend fun resolveTorrentIfNeeded(video: Video): Video? {
         if (!isTorrentVideoUrl(video.videoUrl)) return video
 
-        logcat(LogPriority.INFO) { "[Torrent] detected torrent video, resolving via local server: ${video.videoUrl}" }
+        // Don't log the raw URL: torrent magnets can embed private-tracker passkeys.
+        logcat(LogPriority.INFO) { "[Torrent] detected torrent video, resolving via local server" }
         return withIOContext {
             try {
                 if (!activity.ensureTorrentServerRunning()) {
