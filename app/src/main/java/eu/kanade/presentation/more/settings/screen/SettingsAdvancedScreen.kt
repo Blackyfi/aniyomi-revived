@@ -34,6 +34,7 @@ import eu.kanade.presentation.more.settings.screen.advanced.ClearAnimeDatabaseSc
 import eu.kanade.presentation.more.settings.screen.advanced.ClearDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugInfoScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugLogsScreen
+import eu.kanade.presentation.more.settings.screen.debug.ExtensionErrorLogScreen
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
@@ -126,6 +127,11 @@ object SettingsAdvancedScreen : SearchableSettings {
                 title = stringResource(MR.strings.label_debug_logs),
                 subtitle = stringResource(MR.strings.pref_debug_logs_summary),
                 onClick = { navigator.push(DebugLogsScreen()) },
+            ),
+            Preference.PreferenceItem.TextPreference(
+                title = "Extension error log",
+                subtitle = "Errors thrown by extensions; copy or delete them",
+                onClick = { navigator.push(ExtensionErrorLogScreen()) },
             ),
             Preference.PreferenceItem.TextPreference(
                 title = stringResource(MR.strings.pref_onboarding_guide),
