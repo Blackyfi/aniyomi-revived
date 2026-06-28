@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,7 +79,19 @@ internal class HttpPageLoader(
             if (e is CancellationException) {
                 throw e
             }
-            source.getPageList(chapter.chapter)
+            runCatching { source.getPageList(chapter.chapter) }
+                .onFailure { err ->
+                    if (err !is CancellationException) {
+                        ExtensionErrorStorage.record(
+                            source.id,
+                            source.name,
+                            "Load pages",
+                            err,
+                            detail = chapter.chapter.name,
+                        )
+                    }
+                }
+                .getOrThrow()
         }
         return pages.mapIndexed { index, page ->
             // Don't trust sources and use our own indexing

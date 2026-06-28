@@ -10,6 +10,7 @@ import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.util.ioCoroutineScope
 import eu.kanade.tachiyomi.animesource.AnimeCatalogueSource
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
+import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentMapOf
@@ -169,6 +170,7 @@ abstract class AnimeSearchScreenModel(
                         }
                     } catch (e: Exception) {
                         if (isActive) {
+                            ExtensionErrorStorage.record(source.id, source.name, "Search", e, detail = query)
                             updateItem(source, AnimeSearchItemResult.Error(e))
                         }
                     }
