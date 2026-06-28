@@ -106,6 +106,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Request
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -1399,6 +1401,7 @@ class PlayerViewModel @JvmOverloads constructor(
                 video
             }
             )?.let { resolveTorrentIfNeeded(it) }
+            ?.let { forceHlsDemuxerIfDisguised(source, it) }
 
         if (resolvedVideo == null || resolvedVideo.videoUrl.isEmpty()) {
             if (currentVideo.value == null) {
@@ -1479,6 +1482,53 @@ class PlayerViewModel @JvmOverloads constructor(
                 logcat(LogPriority.ERROR, e) { "[Torrent] failed to resolve torrent video" }
                 null
             }
+        }
+    }
+
+    /**
+     * Some sources disguise an HLS playlist behind a non-streaming file extension and an image
+     * MIME type (e.g. rou.video serves `.../index.jpg` as `image/jpeg`, even though the body is a
+     * `#EXTM3U` playlist and the segments are MPEG-TS). ffmpeg deliberately refuses to treat such a
+     * response as HLS ("Not detecting m3u8/hls with non standard extension and non standard mime
+     * type"), demuxes the playlist text as a still image and mpv shows it for ~1s before ending.
+     *
+     * Peek the first bytes of the stream and, if it's actually an HLS playlist, force mpv's demuxer
+     * so it plays as video. Only runs for http(s) URLs whose path has no recognised AV/streaming
+     * extension — exactly the cases ffmpeg would otherwise mis-detect — so normal videos pay no
+     * extra request. Best-effort: any failure leaves the video untouched.
+     */
+    private suspend fun forceHlsDemuxerIfDisguised(source: AnimeSource?, video: Video): Video {
+        val httpSource = source as? AnimeHttpSource ?: return video
+        val url = video.videoUrl
+        if (!url.startsWith("http", ignoreCase = true)) return video
+        if (video.mpvArgs.any { it.first == "demuxer-lavf-format" }) return video
+
+        val path = url.toHttpUrlOrNull()?.encodedPath ?: return video
+        val ext = path.substringAfterLast('.', "").lowercase()
+        // Standard extensions are detected correctly by ffmpeg; don't waste a request probing them.
+        if (ext.isEmpty() || ext in RECOGNISED_VIDEO_EXTENSIONS) return video
+
+        val isHls = withIOContext {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .headers(video.headers ?: httpSource.headers)
+                    .header("Range", "bytes=0-1023")
+                    .build()
+                httpSource.client.newCall(request).execute().use { response ->
+                    response.peekBody(MAX_HLS_PROBE_BYTES).string().trimStart().startsWith("#EXTM3U")
+                }
+            } catch (e: Exception) {
+                logcat(LogPriority.DEBUG, e) { "[Player] HLS probe failed, leaving video untouched" }
+                false
+            }
+        }
+
+        return if (isHls) {
+            logcat(LogPriority.INFO) { "[Player] disguised HLS detected (ext=$ext), forcing mpv hls demuxer" }
+            video.copy(mpvArgs = video.mpvArgs + ("demuxer-lavf-format" to "hls"))
+        } else {
+            video
         }
     }
 
@@ -2088,6 +2138,19 @@ class PlayerViewModel @JvmOverloads constructor(
         data class ShareImage(val uri: Uri, val seconds: String) : Event()
     }
 }
+
+/** Bytes peeked from a stream to decide whether it's a disguised HLS playlist. */
+private const val MAX_HLS_PROBE_BYTES = 1024L
+
+/**
+ * File extensions ffmpeg/mpv detect correctly on their own, so [PlayerViewModel.loadVideo] skips the
+ * disguised-HLS content probe for them. Anything outside this set (e.g. an `.jpg` that's really an
+ * HLS playlist) gets probed.
+ */
+private val RECOGNISED_VIDEO_EXTENSIONS = setOf(
+    "m3u8", "m3u", "mpd", "mp4", "mkv", "webm", "mov", "avi", "flv", "wmv", "m4v",
+    "ts", "mpg", "mpeg", "ogv", "3gp", "m4a", "mp3", "aac", "flac", "opus", "ogg", "wav",
+)
 
 fun CustomButton.execute() {
     MPVLib.command(arrayOf("script-message", "call_button_$id"))
