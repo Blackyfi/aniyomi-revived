@@ -44,6 +44,7 @@ import eu.kanade.tachiyomi.ui.entries.anime.track.AnimeTrackItem
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.util.AniChartApi
+import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import eu.kanade.tachiyomi.util.episode.getNextUnseen
 import eu.kanade.tachiyomi.util.removeCovers
 import eu.kanade.tachiyomi.util.system.toast
@@ -609,6 +610,7 @@ class AnimeScreenModel(
             val message = if (e is NoEpisodesException) {
                 context.stringResource(AYMR.strings.no_episodes_error)
             } else {
+                ExtensionErrorStorage.record(state.source.id, state.source.name, "Load episodes", e)
                 logcat(LogPriority.ERROR, e)
                 with(context) { e.formattedMessage }
             }

@@ -42,6 +42,7 @@ import eu.kanade.tachiyomi.source.MangaSourceInfo
 import eu.kanade.tachiyomi.source.MultiSourceCatalogSource
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
+import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
 import eu.kanade.tachiyomi.util.system.toast
@@ -656,6 +657,7 @@ class MangaScreenModel(
                 }
                 context.stringResource(MR.strings.no_chapters_error)
             } else {
+                ExtensionErrorStorage.record(state.source.id, state.source.name, "Load chapters", e)
                 logcat(LogPriority.ERROR, e) {
                     "Failed to fetch chapter list for '${state.manga.title}' (url=${state.manga.url}) " +
                         "from source '${state.source.name}' (id=${state.source.id})"
