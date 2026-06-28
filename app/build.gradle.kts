@@ -313,6 +313,8 @@ dependencies {
     implementation(aniyomilibs.seeker)
     // true type parser
     implementation(aniyomilibs.truetypeparser)
+    // torrent streaming engine (self-hosted Go TorrServer fork)
+    implementation(aniyomilibs.torrentserver)
 }
 
 androidComponents {

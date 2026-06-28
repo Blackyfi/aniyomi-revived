@@ -67,6 +67,8 @@ import eu.kanade.tachiyomi.data.saver.Location
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
+import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
+import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
 import eu.kanade.tachiyomi.ui.player.controls.components.IndexedSegment
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.getChangedAt
@@ -1390,11 +1392,13 @@ class PlayerViewModel @JvmOverloads constructor(
         updatePausedState()
         pause()
 
-        val resolvedVideo = if (selectedHosterState.videoState[videoIndex] != Video.State.READY) {
-            HosterLoader.getResolvedVideo(source, video)
-        } else {
-            video
-        }
+        val resolvedVideo = (
+            if (selectedHosterState.videoState[videoIndex] != Video.State.READY) {
+                HosterLoader.getResolvedVideo(source, video)
+            } else {
+                video
+            }
+            )?.let { resolveTorrentIfNeeded(it) }
 
         if (resolvedVideo == null || resolvedVideo.videoUrl.isEmpty()) {
             if (currentVideo.value == null) {
@@ -1437,6 +1441,44 @@ class PlayerViewModel @JvmOverloads constructor(
 
         activity.setVideo(resolvedVideo)
         return true
+    }
+
+    /**
+     * If [video] resolves to a torrent ([isTorrentVideoUrl]), route it through the local torrent
+     * server: ensure the server is running, register the torrent and rewrite the video URL to the
+     * local `http://<ip>:8090/stream/...` link that mpv can play. The desired file is taken from the
+     * `index=<n>` query param the extension encodes in the magnet (see [parseTorrentFileIndex]).
+     *
+     * Runs entirely on [Dispatchers.IO] (network + blocking server wait). On failure returns null so
+     * the caller surfaces it through the regular video-resolution error path.
+     *
+     * Non-torrent videos are returned unchanged.
+     */
+    private suspend fun resolveTorrentIfNeeded(video: Video): Video? {
+        if (!isTorrentVideoUrl(video.videoUrl)) return video
+
+        logcat(LogPriority.INFO) { "[Torrent] detected torrent video, resolving via local server: ${video.videoUrl}" }
+        return withIOContext {
+            try {
+                if (!activity.ensureTorrentServerRunning()) {
+                    logcat(LogPriority.ERROR) { "[Torrent] torrent server did not start in time" }
+                    return@withIOContext null
+                }
+
+                val index = parseTorrentFileIndex(video.videoUrl)
+                val torrent = TorrentServerApi.addTorrent(
+                    link = video.videoUrl,
+                    title = video.quality,
+                    save = false,
+                )
+                video.copy(videoUrl = TorrentServerUtils.getTorrentPlayLink(torrent, index))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e) { "[Torrent] failed to resolve torrent video" }
+                null
+            }
+        }
     }
 
     fun onVideoClicked(hosterIndex: Int, videoIndex: Int) {
