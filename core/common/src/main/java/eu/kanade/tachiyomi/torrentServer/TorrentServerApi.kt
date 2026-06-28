@@ -3,6 +3,8 @@ package eu.kanade.tachiyomi.torrentServer
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
+import eu.kanade.tachiyomi.torrentServer.model.BtSets
+import eu.kanade.tachiyomi.torrentServer.model.BtSetsRequest
 import eu.kanade.tachiyomi.torrentServer.model.Torrent
 import eu.kanade.tachiyomi.torrentServer.model.TorrentRequest
 import kotlinx.serialization.builtins.ListSerializer
@@ -48,7 +50,8 @@ object TorrentServerApi {
         data: String = "",
         save: Boolean,
     ): Torrent {
-        logcat(LogPriority.INFO) { "[Torrent] addTorrent title='$title' save=$save link=$link" }
+        // Don't log the raw link: magnets/.torrent URLs can embed private-tracker passkeys.
+        logcat(LogPriority.INFO) { "[Torrent] addTorrent title='$title' save=$save" }
         val req = TorrentRequest(
             action = "add",
             link = link,
@@ -94,6 +97,19 @@ object TorrentServerApi {
             POST("$hostUrl/torrents", body = req.toRequestBody(jsonMediaType)),
         ).execute()
         return json.decodeFromString(ListSerializer(Torrent.serializer()), resp.body.string())
+    }
+    // endregion
+
+    // region Settings
+    fun setSettings(sets: BtSets) {
+        val req = json.encodeToString(BtSetsRequest.serializer(), BtSetsRequest(action = "set", sets = sets))
+        val resp = network.client.newCall(
+            POST("$hostUrl/settings", body = req.toRequestBody(jsonMediaType)),
+        ).execute()
+        if (!resp.isSuccessful) {
+            logcat(LogPriority.ERROR) { "[Torrent] setSettings failed HTTP ${resp.code}" }
+        }
+        resp.close()
     }
     // endregion
 }

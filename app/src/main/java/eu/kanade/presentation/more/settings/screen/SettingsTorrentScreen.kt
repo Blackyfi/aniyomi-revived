@@ -142,18 +142,12 @@ object SettingsTorrentScreen : SearchableSettings {
                                 if (TorrentServerService.isRunning) {
                                     TorrentServerService.stop(context)
                                 }
-                                val cacheDir = if (downloadDir.isNotBlank()) {
-                                    File(downloadDir)
-                                } else {
-                                    File(context.filesDir, TORRENT_DATA_DIR)
-                                }
+                                // Only ever delete the dedicated torrent sub-folder, never the raw
+                                // directory the user typed (which could be e.g. /storage/emulated/0).
+                                val root = if (downloadDir.isNotBlank()) File(downloadDir) else context.filesDir
+                                val cacheDir = File(root, TORRENT_DATA_DIR)
                                 logcat(LogPriority.INFO) { "[Torrent] clearing cache dir: ${cacheDir.absolutePath}" }
-                                // Guard: never wipe the app's internal root, only a sub-directory.
-                                if (cacheDir != context.filesDir && cacheDir.exists()) {
-                                    cacheDir.deleteRecursively()
-                                } else {
-                                    !cacheDir.exists()
-                                }
+                                if (cacheDir.exists()) cacheDir.deleteRecursively() else true
                             }
                             context.toast(
                                 if (cleared) {
