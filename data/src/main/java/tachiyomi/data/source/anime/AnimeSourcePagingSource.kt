@@ -37,6 +37,11 @@ abstract class AnimeSourcePagingSource(
 
     abstract suspend fun requestNextPage(currentPage: Int): AnimesPage
 
+    // URLs already emitted by earlier pages of this paging session. Cursor-paginated sources can
+    // re-serve the same entries across page boundaries when the pager reloads an anchor page or
+    // prefetches; without this the same entry shows up twice while scrolling.
+    private val seenUrls = HashSet<String>()
+
     override suspend fun load(params: LoadParams<Long>): LoadResult<Long, SAnime> {
         val page = params.key ?: 1
 
@@ -51,7 +56,7 @@ abstract class AnimeSourcePagingSource(
         }
 
         return LoadResult.Page(
-            data = animesPage.animes,
+            data = animesPage.animes.filter { seenUrls.add(it.url) },
             prevKey = null,
             nextKey = if (animesPage.hasNextPage) page + 1 else null,
         )

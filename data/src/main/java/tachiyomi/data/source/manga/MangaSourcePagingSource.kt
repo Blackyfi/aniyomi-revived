@@ -40,6 +40,11 @@ abstract class SourcePagingSource(
 
     abstract suspend fun requestNextPage(currentPage: Int): MangasPage
 
+    // URLs already emitted by earlier pages of this paging session. Cursor-paginated sources
+    // (e.g. E-Hentai) can re-serve the same entries across page boundaries when the pager reloads
+    // an anchor page or prefetches; without this the same entry shows up twice while scrolling.
+    private val seenUrls = HashSet<String>()
+
     override suspend fun load(params: LoadParams<Long>): LoadResult<Long, SManga> {
         val page = params.key ?: 1
 
@@ -54,7 +59,7 @@ abstract class SourcePagingSource(
         }
 
         return LoadResult.Page(
-            data = mangasPage.mangas,
+            data = mangasPage.mangas.filter { seenUrls.add(it.url) },
             prevKey = null,
             nextKey = if (mangasPage.hasNextPage) page + 1 else null,
         )
