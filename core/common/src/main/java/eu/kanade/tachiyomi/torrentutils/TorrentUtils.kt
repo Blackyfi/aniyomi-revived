@@ -1,15 +1,19 @@
 package eu.kanade.tachiyomi.torrentutils
 
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
+import eu.kanade.tachiyomi.torrentServer.TorrentServerStarter
 import eu.kanade.tachiyomi.torrentutils.model.DeadTorrentException
 import eu.kanade.tachiyomi.torrentutils.model.TorrentFile
 import eu.kanade.tachiyomi.torrentutils.model.TorrentInfo
 import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
+import uy.kohesive.injekt.injectLazy
 import java.net.SocketTimeoutException
 
 object TorrentUtils {
+    private val torrentServerStarter: TorrentServerStarter by injectLazy()
+
     fun getTorrentInfo(
         url: String,
         title: String,
@@ -17,6 +21,13 @@ object TorrentUtils {
         // Untrusted extensions supply [url]; the local server will fetch it. Restrict to torrent
         // schemes and refuse links pointing at loopback/private hosts (SSRF guard).
         requireSafeTorrentLink(url)
+        // Extensions call this while building the episode list (well before the player opens), but
+        // the server is otherwise only started on playback. Bring it up here so adding the torrent
+        // doesn't fail with "connection refused" to 127.0.0.1:<port>.
+        if (!torrentServerStarter.ensureRunning()) {
+            logcat(LogPriority.ERROR) { "[Torrent] getTorrentInfo: torrent server did not start in time" }
+            throw DeadTorrentException()
+        }
         logcat(LogPriority.INFO) { "[Torrent] getTorrentInfo title='$title'" }
         try {
             val torrent = TorrentServerApi.addTorrent(url, title, "", "", false)
