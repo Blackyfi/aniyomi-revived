@@ -1,6 +1,7 @@
 package tachiyomi.domain.updates.manga.model
 
 import tachiyomi.domain.entries.manga.model.MangaCover
+import tachiyomi.domain.entries.manga.model.MangaType
 
 data class MangaUpdatesWithRelations(
     val mangaId: Long,
@@ -14,4 +15,5 @@ data class MangaUpdatesWithRelations(
     val sourceId: Long,
     val dateFetch: Long,
     val coverData: MangaCover,
+    val mangaType: MangaType = MangaType.UNKNOWN,
 )

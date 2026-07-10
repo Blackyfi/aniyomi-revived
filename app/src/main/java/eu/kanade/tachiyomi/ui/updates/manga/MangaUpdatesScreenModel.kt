@@ -36,6 +36,7 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.manga.interactor.GetManga
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.items.chapter.interactor.GetChapter
 import tachiyomi.domain.items.chapter.interactor.UpdateChapter
 import tachiyomi.domain.items.chapter.model.ChapterUpdate
@@ -58,6 +59,7 @@ class MangaUpdatesScreenModel(
     private val getChapter: GetChapter = Injekt.get(),
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
+    private val libraryType: MangaType = MangaType.MANGA,
 ) : StateScreenModel<MangaUpdatesScreenModel.State>(State()) {
 
     private val _events: Channel<Event> = Channel(Int.MAX_VALUE)
@@ -87,7 +89,7 @@ class MangaUpdatesScreenModel(
                     mutableState.update {
                         it.copy(
                             isLoading = false,
-                            items = updates.toUpdateItems(),
+                            items = updates.filter(::matchesLibraryType).toUpdateItems(),
                         )
                     }
                 }
@@ -97,6 +99,15 @@ class MangaUpdatesScreenModel(
             merge(downloadManager.statusFlow(), downloadManager.progressFlow())
                 .catch { logcat(LogPriority.ERROR, it) }
                 .collect(this@MangaUpdatesScreenModel::updateDownloadState)
+        }
+    }
+
+    // Same split as the library tabs: the Manhwa tab shows only MANHWA entries,
+    // the Manga tab shows everything else (MANGA + not-yet-detected UNKNOWN).
+    private fun matchesLibraryType(update: MangaUpdatesWithRelations): Boolean {
+        return when (libraryType) {
+            MangaType.MANHWA -> update.mangaType == MangaType.MANHWA
+            else -> update.mangaType != MangaType.MANHWA
         }
     }
 

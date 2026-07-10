@@ -21,14 +21,16 @@ AND date_fetch > date_added
 ORDER BY date_fetch DESC;
 
 getRecentUpdates:
-SELECT *
+SELECT updatesView.*, mangas.manga_type
 FROM updatesView
+JOIN mangas ON mangas._id = updatesView.mangaId
 WHERE dateUpload > :after
 LIMIT :limit;
 
 getUpdatesByReadStatus:
-SELECT *
+SELECT updatesView.*, mangas.manga_type
 FROM updatesView
+JOIN mangas ON mangas._id = updatesView.mangaId
 WHERE read = :read
 AND dateUpload > :after
 

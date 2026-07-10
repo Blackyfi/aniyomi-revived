@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import mihon.feature.upcoming.manga.UpcomingMangaScreen
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource
@@ -37,9 +38,12 @@ import tachiyomi.presentation.core.i18n.stringResource
 fun Screen.mangaUpdatesTab(
     context: Context,
     fromMore: Boolean,
+    type: MangaType = MangaType.MANGA,
 ): TabContent {
     val navigator = LocalNavigator.currentOrThrow
-    val screenModel = rememberScreenModel { MangaUpdatesScreenModel() }
+    val screenModel = rememberScreenModel(tag = type.name) {
+        MangaUpdatesScreenModel(libraryType = type)
+    }
     val state by screenModel.state.collectAsState()
 
     val scope = rememberCoroutineScope()
@@ -56,7 +60,11 @@ fun Screen.mangaUpdatesTab(
     }
 
     return TabContent(
-        titleRes = AYMR.strings.label_updates,
+        titleRes = if (type == MangaType.MANHWA) {
+            AYMR.strings.label_manhwa_updates
+        } else {
+            AYMR.strings.label_updates
+        },
         searchEnabled = false,
         content = { contentPadding, _ ->
             MangaUpdateScreen(
