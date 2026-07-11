@@ -1,6 +1,7 @@
 package tachiyomi.data.history.manga
 
 import tachiyomi.domain.entries.manga.model.MangaCover
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.history.manga.model.MangaHistory
 import tachiyomi.domain.history.manga.model.MangaHistoryWithRelations
 import java.util.Date
@@ -30,6 +31,7 @@ object MangaHistoryMapper {
         chapterNumber: Double,
         readAt: Date?,
         readDuration: Long,
+        mangaType: Long,
     ): MangaHistoryWithRelations = MangaHistoryWithRelations(
         id = historyId,
         chapterId = chapterId,
@@ -45,5 +47,6 @@ object MangaHistoryMapper {
             url = thumbnailUrl,
             lastModified = coverLastModified,
         ),
+        mangaType = MangaType.fromId(mangaType),
     )
 }

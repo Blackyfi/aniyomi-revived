@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -44,11 +45,14 @@ val resumeLastChapterReadEvent = Channel<Unit>()
 fun Screen.mangaHistoryTab(
     context: Context,
     fromMore: Boolean,
+    type: MangaType = MangaType.MANGA,
 ): TabContent {
     val snackbarHostState = SnackbarHostState()
 
     val navigator = LocalNavigator.currentOrThrow
-    val screenModel = rememberScreenModel { MangaHistoryScreenModel() }
+    val screenModel = rememberScreenModel(tag = type.name) {
+        MangaHistoryScreenModel(libraryType = type)
+    }
     val state by screenModel.state.collectAsState()
     val searchQuery by screenModel.query.collectAsState()
 
@@ -75,8 +79,14 @@ fun Screen.mangaHistoryTab(
     }
 
     return TabContent(
-        titleRes = AYMR.strings.label_history,
+        titleRes = if (type == MangaType.MANHWA) {
+            AYMR.strings.label_manhwa_history
+        } else {
+            AYMR.strings.label_history
+        },
         searchEnabled = true,
+        searchQuery = searchQuery,
+        onChangeSearchQuery = screenModel::search,
         content = { contentPadding, _ ->
             MangaHistoryScreen(
                 state = state,
