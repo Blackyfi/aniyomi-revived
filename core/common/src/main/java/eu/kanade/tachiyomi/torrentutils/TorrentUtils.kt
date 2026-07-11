@@ -9,6 +9,7 @@ import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
+import java.net.InetAddress
 import java.net.SocketTimeoutException
 
 object TorrentUtils {
@@ -83,13 +84,37 @@ object TorrentUtils {
 
     private fun isPrivateHost(host: String): Boolean {
         val h = host.removePrefix("[").removeSuffix("]").lowercase()
-        return h == "localhost" ||
-            h == "::1" ||
-            h == "0.0.0.0" ||
-            h.startsWith("127.") ||
-            h.startsWith("10.") ||
-            h.startsWith("192.168.") ||
-            h.startsWith("169.254.") ||
-            h.matches(Regex("""172\.(1[6-9]|2\d|3[01])\..*"""))
+        if (h == "localhost" || h.endsWith(".localhost") || h.endsWith(".local")) return true
+
+        val isIpLiteral = h.contains(':') || h.matches(IPV4_LITERAL)
+        if (isIpLiteral) {
+            return try {
+                isPrivateAddress(InetAddress.getByName(h))
+            } catch (e: Exception) {
+                true // unparseable IP literal → refuse
+            }
+        }
+
+        // Hostname: resolve it ourselves and refuse if any answer is private, so a public name
+        // pointed at 127.0.0.1/192.168.x (DNS rebinding) can't reach the local network through
+        // the torrent server. If resolution fails, let it through — the server will fail the
+        // same lookup anyway and this keeps flaky DNS from mislabeling links as "non-public".
+        return try {
+            InetAddress.getAllByName(h).any(::isPrivateAddress)
+        } catch (e: Exception) {
+            false
+        }
     }
+
+    private fun isPrivateAddress(addr: InetAddress): Boolean {
+        val bytes = addr.address
+        return addr.isLoopbackAddress ||
+            addr.isSiteLocalAddress || // 10/8, 172.16/12, 192.168/16
+            addr.isLinkLocalAddress || // 169.254/16, fe80::/10
+            addr.isAnyLocalAddress || // 0.0.0.0, ::
+            // IPv6 unique-local fc00::/7, which isSiteLocalAddress does not cover
+            (bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC)
+    }
+
+    private val IPV4_LITERAL = Regex("""\d{1,3}(\.\d{1,3}){3}""")
 }
