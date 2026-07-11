@@ -12,6 +12,7 @@ import tachiyomi.domain.category.manga.interactor.GetMangaCategories
 import tachiyomi.domain.entries.manga.interactor.GetMangaByUrlAndSourceId
 import tachiyomi.domain.entries.manga.interactor.MangaFetchInterval
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.domain.track.manga.interactor.GetMangaTracks
@@ -101,6 +102,8 @@ class MangaRestorer(
             status = newer.status,
             initialized = this.initialized || newer.initialized,
             version = newer.version,
+            // Prefer whichever side has an explicit classification over UNKNOWN
+            mangaType = if (newer.mangaType != MangaType.UNKNOWN) newer.mangaType else this.mangaType,
         )
     }
 
@@ -129,8 +132,8 @@ class MangaRestorer(
                 updateStrategy = manga.updateStrategy.let(MangaUpdateStrategyColumnAdapter::encode),
                 version = manga.version,
                 isSyncing = 1,
-                // Not stored in backups; keep the existing/auto-detected value.
-                mangaType = null,
+                // UNKNOWN means the backup carried no classification; keep the DB value then
+                mangaType = manga.mangaType.id.takeUnless { manga.mangaType == MangaType.UNKNOWN },
                 downloadNewChapters = null,
             )
         }
@@ -264,6 +267,7 @@ class MangaRestorer(
                 dateAdded = manga.dateAdded,
                 updateStrategy = manga.updateStrategy,
                 version = manga.version,
+                mangaType = manga.mangaType.id,
             )
             mangasQueries.selectLastInsertedRowId()
         }

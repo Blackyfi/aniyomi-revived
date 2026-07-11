@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
 
 @Suppress("DEPRECATION")
 @Serializable
@@ -40,6 +41,8 @@ data class BackupManga(
     @ProtoNumber(107) var favoriteModifiedAt: Long? = null,
     @ProtoNumber(108) var excludedScanlators: List<String> = emptyList(),
     @ProtoNumber(109) var version: Long = 0,
+    // Fork-specific fields start at 900 to avoid clashing with future upstream numbers
+    @ProtoNumber(900) var mangaType: Long = 0,
 ) {
     fun getMangaImpl(): Manga {
         return Manga.create().copy(
@@ -60,6 +63,7 @@ data class BackupManga(
             lastModifiedAt = this@BackupManga.lastModifiedAt,
             favoriteModifiedAt = this@BackupManga.favoriteModifiedAt,
             version = this@BackupManga.version,
+            mangaType = MangaType.fromId(this@BackupManga.mangaType),
         )
     }
 }

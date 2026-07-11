@@ -120,6 +120,7 @@ class MangaRepositoryImpl(
                 dateAdded = manga.dateAdded,
                 updateStrategy = manga.updateStrategy,
                 version = manga.version,
+                mangaType = manga.mangaType.id,
             )
             mangasQueries.selectLastInsertedRowId()
         }
