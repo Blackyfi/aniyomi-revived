@@ -185,11 +185,11 @@ class TorrentServerService : Service() {
         fun wait(timeout: Int = -1): Boolean {
             var count = 0
             while (TorrentServerApi.echo() == "") {
-                Thread.sleep(1000)
-                count++
-                if (timeout in 0 until count) {
+                if (timeout in 0..count) {
                     return false
                 }
+                Thread.sleep(1000)
+                count++
             }
             return true
         }
