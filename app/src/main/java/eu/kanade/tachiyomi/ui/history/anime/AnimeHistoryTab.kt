@@ -80,6 +80,8 @@ fun Screen.animeHistoryTab(
     return TabContent(
         titleRes = AYMR.strings.label_anime_history,
         searchEnabled = true,
+        searchQuery = searchQuery,
+        onChangeSearchQuery = screenModel::search,
         content = { contentPadding, _ ->
             AnimeHistoryScreen(
                 state = state,

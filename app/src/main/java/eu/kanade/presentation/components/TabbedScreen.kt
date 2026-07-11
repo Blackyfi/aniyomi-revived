@@ -53,15 +53,22 @@ fun TabbedScreen(
                 val tab = tabs[state.currentPage]
                 val searchEnabled = tab.searchEnabled
 
-                val actualQuery = when (state.currentPage % 2) {
-                    1 -> mangaSearchQuery // History and Browse
-                    else -> animeSearchQuery
+                // Tabs carrying their own search state win; the page-parity fallback only works
+                // for the historical two-tab (anime/manga) screens.
+                val actualQuery = if (tab.onChangeSearchQuery != null) {
+                    tab.searchQuery
+                } else {
+                    when (state.currentPage % 2) {
+                        1 -> mangaSearchQuery // History and Browse
+                        else -> animeSearchQuery
+                    }
                 }
 
-                val actualOnChange = when (state.currentPage % 2) {
-                    1 -> onChangeMangaSearchQuery // History and Browse
-                    else -> onChangeAnimeSearchQuery
-                }
+                val actualOnChange = tab.onChangeSearchQuery
+                    ?: when (state.currentPage % 2) {
+                        1 -> onChangeMangaSearchQuery // History and Browse
+                        else -> onChangeAnimeSearchQuery
+                    }
 
                 SearchToolbar(
                     titleContent = {
@@ -131,6 +138,10 @@ data class TabContent(
     val numberTitle: Int = 0,
     val cancelAction: () -> Unit = {},
     val navigateUp: (() -> Unit)? = null,
+    // Per-tab search state; when onChangeSearchQuery is set it overrides the screen-level
+    // manga/anime search params (which can't address more than two tabs).
+    val searchQuery: String? = null,
+    val onChangeSearchQuery: ((String?) -> Unit)? = null,
 )
 
 @Composable

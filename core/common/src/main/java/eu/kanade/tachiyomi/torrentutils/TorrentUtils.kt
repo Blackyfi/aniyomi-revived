@@ -109,9 +109,12 @@ object TorrentUtils {
     private fun isPrivateAddress(addr: InetAddress): Boolean {
         val bytes = addr.address
         return addr.isLoopbackAddress ||
-            addr.isSiteLocalAddress || // 10/8, 172.16/12, 192.168/16
-            addr.isLinkLocalAddress || // 169.254/16, fe80::/10
-            addr.isAnyLocalAddress || // 0.0.0.0, ::
+            addr.isSiteLocalAddress ||
+            // 10/8, 172.16/12, 192.168/16
+            addr.isLinkLocalAddress ||
+            // 169.254/16, fe80::/10
+            addr.isAnyLocalAddress ||
+            // 0.0.0.0, ::
             // IPv6 unique-local fc00::/7, which isSiteLocalAddress does not cover
             (bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC)
     }

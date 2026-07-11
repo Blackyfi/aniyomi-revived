@@ -37,6 +37,7 @@ import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.manga.interactor.GetDuplicateLibraryManga
 import tachiyomi.domain.entries.manga.interactor.GetManga
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.history.manga.interactor.GetMangaHistory
 import tachiyomi.domain.history.manga.interactor.GetNextChapters
 import tachiyomi.domain.history.manga.interactor.RemoveMangaHistory
@@ -60,6 +61,7 @@ class MangaHistoryScreenModel(
     private val updateManga: UpdateManga = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
     private val sourceManager: MangaSourceManager = Injekt.get(),
+    private val libraryType: MangaType = MangaType.MANGA,
 ) : StateScreenModel<MangaHistoryScreenModel.State>(State()) {
 
     private val _events: Channel<Event> = Channel(Channel.UNLIMITED)
@@ -77,7 +79,7 @@ class MangaHistoryScreenModel(
                         logcat(LogPriority.ERROR, error)
                         _events.send(Event.InternalError)
                     }
-                    .map { it.toHistoryUiModels() }
+                    .map { it.filter(::matchesLibraryType).toHistoryUiModels() }
                     .flowOn(Dispatchers.IO)
                     .collect { newList -> mutableState.update { it.copy(list = newList) } }
             }
@@ -87,6 +89,15 @@ class MangaHistoryScreenModel(
     fun search(query: String?) {
         screenModelScope.launchIO {
             _query.emit(query)
+        }
+    }
+
+    // Same split as the library tabs: the Manhwa tab shows only MANHWA entries,
+    // the Manga tab shows everything else (MANGA + not-yet-detected UNKNOWN).
+    private fun matchesLibraryType(history: MangaHistoryWithRelations): Boolean {
+        return when (libraryType) {
+            MangaType.MANHWA -> history.mangaType == MangaType.MANHWA
+            else -> history.mangaType != MangaType.MANHWA
         }
     }
 

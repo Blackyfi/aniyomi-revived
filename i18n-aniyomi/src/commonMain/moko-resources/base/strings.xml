@@ -523,6 +523,7 @@
     <string name="label_storage">Storage</string>
     <string name="label_history">Manga</string>
     <string name="label_anime_history">Anime</string>
+    <string name="label_manhwa_history">Manhwa</string>
     <string name="label_updates">Manga</string>
     <string name="label_anime_updates">Anime</string>
     <string name="label_manhwa_updates">Manhwa</string>
