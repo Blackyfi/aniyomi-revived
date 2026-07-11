@@ -106,9 +106,15 @@ open class MangaLibraryScreenModel(
     private val libraryType: MangaType = MangaType.MANGA,
 ) : StateScreenModel<MangaLibraryScreenModel.State>(State()) {
 
-    var activeCategoryIndex: Int by libraryPreferences.lastUsedMangaCategory().asState(
-        screenModelScope,
-    )
+    // Each tab remembers its own active category; sharing one index would make switching
+    // Manga <-> Manhwa jump both tabs to whichever category was used last.
+    var activeCategoryIndex: Int by (
+        if (libraryType == MangaType.MANHWA) {
+            libraryPreferences.lastUsedManhwaCategory()
+        } else {
+            libraryPreferences.lastUsedMangaCategory()
+        }
+        ).asState(screenModelScope)
 
     init {
         screenModelScope.launchIO {
