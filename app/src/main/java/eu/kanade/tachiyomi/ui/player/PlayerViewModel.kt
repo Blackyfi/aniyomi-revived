@@ -1515,9 +1515,14 @@ class PlayerViewModel @JvmOverloads constructor(
                     .headers(video.headers ?: httpSource.headers)
                     .header("Range", "bytes=0-1023")
                     .build()
-                httpSource.client.newCall(request).execute().use { response ->
-                    response.peekBody(MAX_HLS_PROBE_BYTES).string().trimStart().startsWith("#EXTM3U")
-                }
+                // Hard cap on the whole probe: a slow or Range-ignoring server must not be able to
+                // stall playback start; worst case we skip the fix and mpv behaves as before.
+                httpSource.client.newBuilder()
+                    .callTimeout(HLS_PROBE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                    .newCall(request).execute().use { response ->
+                        response.peekBody(MAX_HLS_PROBE_BYTES).string().trimStart().startsWith("#EXTM3U")
+                    }
             } catch (e: Exception) {
                 logcat(LogPriority.DEBUG, e) { "[Player] HLS probe failed, leaving video untouched" }
                 false
@@ -2141,6 +2146,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
 /** Bytes peeked from a stream to decide whether it's a disguised HLS playlist. */
 private const val MAX_HLS_PROBE_BYTES = 1024L
+private const val HLS_PROBE_TIMEOUT_SECONDS = 5L
 
 /**
  * File extensions ffmpeg/mpv detect correctly on their own, so [PlayerViewModel.loadVideo] skips the
