@@ -3,6 +3,7 @@ package tachiyomi.data.updates.manga
 import kotlinx.coroutines.flow.Flow
 import tachiyomi.data.handlers.manga.MangaDatabaseHandler
 import tachiyomi.domain.entries.manga.model.MangaCover
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.updates.manga.model.MangaUpdatesWithRelations
 import tachiyomi.domain.updates.manga.repository.MangaUpdatesRepository
 
@@ -53,6 +54,7 @@ class MangaUpdatesRepositoryImpl(
         coverLastModified: Long,
         dateUpload: Long,
         dateFetch: Long,
+        mangaType: Long,
     ): MangaUpdatesWithRelations = MangaUpdatesWithRelations(
         mangaId = mangaId,
         mangaTitle = mangaTitle,
@@ -71,5 +73,6 @@ class MangaUpdatesRepositoryImpl(
             url = thumbnailUrl,
             lastModified = coverLastModified,
         ),
+        mangaType = MangaType.fromId(mangaType),
     )
 }
