@@ -369,7 +369,10 @@ class MangaDownloader(
         val pending = queueState.value.filter {
             it.manga.id == mangaId &&
                 it.pages == null &&
-                it.status.value <= MangaDownload.State.DOWNLOADING.value
+                // Strictly below DOWNLOADING: an active download resolves its own page list right
+                // now (against the still-effective old source), and writing pages here would race
+                // that fetch.
+                it.status.value < MangaDownload.State.DOWNLOADING.value
         }
         if (pending.isEmpty()) return
         // Freeze concurrently so this never noticeably delays a source switch, even with a long
