@@ -49,4 +49,5 @@ val migrations: List<Migration>
         VideoOrientationMigration(),
         CategoryPreferencesCleanupMigration(),
         PrefLangMigration(),
+        ResetUpdateRestrictionsMigration(),
     )
