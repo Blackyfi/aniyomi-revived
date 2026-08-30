@@ -56,14 +56,16 @@ class LibraryPreferences(
         ),
     )
 
+    // No restrictions by default. Shipping these on made the global update quietly
+    // useless: ENTRY_HAS_UNVIEWED is self-reinforcing (one unread chapter and the
+    // entry is never polled again, so it stays unread forever), ENTRY_NON_VIEWED
+    // freezes everything you have not started, and ENTRY_OUTSIDE_RELEASE_PERIOD
+    // strands entries for up to MAX_INTERVAL (28) days whenever a source cannot
+    // supply usable upload dates. Users who want any of them can tick them under
+    // Settings -> Library -> Global update.
     fun autoUpdateItemRestrictions() = preferenceStore.getStringSet(
         "library_update_manga_restriction",
-        setOf(
-            ENTRY_HAS_UNVIEWED,
-            ENTRY_NON_COMPLETED,
-            ENTRY_NON_VIEWED,
-            ENTRY_OUTSIDE_RELEASE_PERIOD,
-        ),
+        emptySet(),
     )
 
     fun autoUpdateMetadata() = preferenceStore.getBoolean("auto_update_metadata", false)
