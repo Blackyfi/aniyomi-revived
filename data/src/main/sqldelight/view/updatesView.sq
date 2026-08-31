@@ -20,18 +20,25 @@ WHERE favorite = 1
 AND date_fetch > date_added
 ORDER BY date_fetch DESC;
 
+-- The ORDER BY inside updatesView does NOT survive this join: SQLite is free to
+-- drive the join from `chapters` in rowid order, which shuffles the rows. The
+-- Updates screen groups consecutive rows by date, so an unordered result yields
+-- several headers for the same day -- duplicate LazyColumn keys, and a crash.
+-- Order explicitly here (it also makes LIMIT keep the *newest* rows).
 getRecentUpdates:
 SELECT updatesView.*, mangas.manga_type
 FROM updatesView
 JOIN mangas ON mangas._id = updatesView.mangaId
 WHERE dateUpload > :after
+ORDER BY updatesView.datefetch DESC
 LIMIT :limit;
 
+-- Same explicit ordering as getRecentUpdates above.
 getUpdatesByReadStatus:
 SELECT updatesView.*, mangas.manga_type
 FROM updatesView
 JOIN mangas ON mangas._id = updatesView.mangaId
 WHERE read = :read
 AND dateUpload > :after
-
+ORDER BY updatesView.datefetch DESC
 LIMIT :limit;
