@@ -387,7 +387,8 @@ class MangaUpdatesScreenModel(
                     val beforeDate = before?.item?.update?.dateFetch?.toLocalDate()
                     val afterDate = after?.item?.update?.dateFetch?.toLocalDate()
                     when {
-                        beforeDate != afterDate && afterDate != null -> MangaUpdatesUiModel.Header(afterDate)
+                        after != null && afterDate != null && beforeDate != afterDate ->
+                            MangaUpdatesUiModel.Header(afterDate, after.item.update.chapterId)
                         // Return null to avoid adding a separator between two items.
                         else -> null
                     }

@@ -409,7 +409,8 @@ class AnimeUpdatesScreenModel(
                     val beforeDate = before?.item?.update?.dateFetch?.toLocalDate()
                     val afterDate = after?.item?.update?.dateFetch?.toLocalDate()
                     when {
-                        beforeDate != afterDate && afterDate != null -> AnimeUpdatesUiModel.Header(afterDate)
+                        after != null && afterDate != null && beforeDate != afterDate ->
+                            AnimeUpdatesUiModel.Header(afterDate, after.item.update.episodeId)
                         // Return null to avoid adding a separator between two items.
                         else -> null
                     }
