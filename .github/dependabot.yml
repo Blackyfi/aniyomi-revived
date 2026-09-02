@@ -1,0 +1,9 @@
+# Keep the CI actions current. Gradle dependencies are deliberately left out:
+# this is a fork that merges upstream regularly, and per-library PRs would fight
+# those merges.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
