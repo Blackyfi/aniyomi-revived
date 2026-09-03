@@ -625,4 +625,9 @@
     <string name="channel_torrent_server">Torrent server</string>
     <string name="torrent_server_is_running">Torrent server is running</string>
     <string name="action_stop_torrent_server">Stop</string>
+    <!-- Server-side chapter progress indicators (sources that report it, e.g. MangaVault) -->
+    <string name="server_chapter_downloaded">Pages stored on the server</string>
+    <string name="server_chapter_not_downloaded">Pages not stored on the server yet</string>
+    <string name="server_chapter_upscaled">Upscaled on the server</string>
+    <string name="server_chapter_not_upscaled">Not upscaled yet</string>
 </resources>
