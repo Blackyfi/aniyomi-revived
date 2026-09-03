@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkRemove
+import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.Download
@@ -38,9 +41,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
+import eu.kanade.tachiyomi.source.ChapterPipelineState
 import me.saket.swipe.SwipeableActionsBox
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.SECONDARY_ALPHA
 import tachiyomi.presentation.core.i18n.stringResource
@@ -52,6 +57,7 @@ fun MangaChapterListItem(
     date: String?,
     readProgress: String?,
     scanlator: String?,
+    serverPipeline: ChapterPipelineState?,
     read: Boolean,
     bookmark: Boolean,
     selected: Boolean,
@@ -169,6 +175,12 @@ fun MangaChapterListItem(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        if (serverPipeline != null) {
+                            ServerPipelineIndicators(
+                                state = serverPipeline,
+                                dimmed = read,
+                            )
+                        }
                     }
                 }
             }
@@ -240,3 +252,57 @@ private fun swipeAction(
 }
 
 private val swipeActionThreshold = 56.dp
+
+/**
+ * The two steps the source's server takes on a chapter after it is listed: fetching its pages, then
+ * upscaling them.
+ *
+ * Both icons are always drawn so the row reads at a glance — a pending step is the same shape,
+ * dimmed, rather than absent, which keeps the icons in fixed positions down the list instead of
+ * shifting as chapters complete. This says nothing about whether *this device* has the chapter
+ * downloaded; that is what [ChapterDownloadIndicator] on the right of the row is for.
+ */
+@Composable
+private fun ServerPipelineIndicators(
+    state: ChapterPipelineState,
+    dimmed: Boolean,
+) {
+    val baseAlpha = if (dimmed) DISABLED_ALPHA else 1f
+    DotSeparatorText()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CloudDone,
+            contentDescription = stringResource(
+                if (state.serverDownloaded) {
+                    AYMR.strings.server_chapter_downloaded
+                } else {
+                    AYMR.strings.server_chapter_not_downloaded
+                },
+            ),
+            modifier = Modifier.size(14.dp),
+            tint = LocalContentColor.current.copy(
+                alpha = if (state.serverDownloaded) baseAlpha else baseAlpha * PENDING_STEP_ALPHA,
+            ),
+        )
+        Icon(
+            imageVector = Icons.Outlined.AutoAwesome,
+            contentDescription = stringResource(
+                if (state.serverUpscaled) {
+                    AYMR.strings.server_chapter_upscaled
+                } else {
+                    AYMR.strings.server_chapter_not_upscaled
+                },
+            ),
+            modifier = Modifier.size(14.dp),
+            tint = LocalContentColor.current.copy(
+                alpha = if (state.serverUpscaled) baseAlpha else baseAlpha * PENDING_STEP_ALPHA,
+            ),
+        )
+    }
+}
+
+/** How far a not-yet-done step fades relative to a done one. */
+private const val PENDING_STEP_ALPHA = 0.28f
