@@ -56,6 +56,7 @@ import tachiyomi.core.metadata.comicinfo.COMIC_INFO_FILE
 import tachiyomi.core.metadata.comicinfo.ComicInfo
 import tachiyomi.domain.category.manga.interactor.GetMangaCategories
 import tachiyomi.domain.download.service.DownloadPreferences
+import tachiyomi.domain.download.service.allocateDownloadSlots
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.domain.source.manga.service.MangaSourceManager
@@ -217,35 +218,21 @@ class MangaDownloader(
             ) { queue, slots -> queue to slots }
                 .transformLatest { (queue, slots) ->
                     while (true) {
-                        // Group not-yet-finished downloads by source, then apply a per-source
-                        // politeness cap: unmetered sources are uncapped, metered ones are limited
-                        // to PER_SOURCE_LIMIT to avoid hammering a single IP.
-                        val cappedBySource = queue.asSequence()
+                        // Group not-yet-finished downloads by source and pair each group with
+                        // its politeness cap: unmetered sources (a self-hosted server) are
+                        // uncapped, metered ones prefer to stay at PER_SOURCE_LIMIT so we do not
+                        // hammer a single IP. The cap is a preference, not a ceiling -- see
+                        // allocateDownloadSlots.
+                        val queuesBySource = queue.asSequence()
                             .filter {
                                 it.status.value <= MangaDownload.State.DOWNLOADING.value
                             } // Ignore completed downloads, leave them in the queue
                             .groupBy { it.source }
                             .map { (source, downloads) ->
-                                if (source is UnmeteredSource) downloads else downloads.take(PER_SOURCE_LIMIT)
+                                val cap = if (source is UnmeteredSource) downloads.size else PER_SOURCE_LIMIT
+                                downloads to cap
                             }
-                        // Round-robin across sources: round 0 takes one download per source
-                        // (preserving cross-source parallelism + politeness), filling up to
-                        // `slots` downloads in total.
-                        val activeDownloads = buildList {
-                            var round = 0
-                            while (size < slots) {
-                                var added = false
-                                for (downloads in cappedBySource) {
-                                    if (round < downloads.size) {
-                                        add(downloads[round])
-                                        added = true
-                                        if (size >= slots) break
-                                    }
-                                }
-                                if (!added) break
-                                round++
-                            }
-                        }
+                        val activeDownloads = allocateDownloadSlots(queuesBySource, slots)
                         emit(activeDownloads)
 
                         if (activeDownloads.isEmpty()) break
