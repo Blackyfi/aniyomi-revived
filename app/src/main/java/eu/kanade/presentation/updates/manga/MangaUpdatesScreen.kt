@@ -141,6 +141,12 @@ private fun MangaUpdatesBottomBar(
 }
 
 sealed interface MangaUpdatesUiModel {
-    data class Header(val date: LocalDate) : MangaUpdatesUiModel
+    /**
+     * @param anchorChapterId id of the first item this header introduces. A date on its
+     * own is not a safe LazyColumn key: the same day heads more than one group whenever
+     * the rows are not sorted by date, and a repeated key crashes the list. Chapter ids
+     * are unique, and each one anchors at most one header.
+     */
+    data class Header(val date: LocalDate, val anchorChapterId: Long) : MangaUpdatesUiModel
     data class Item(val item: MangaUpdatesItem) : MangaUpdatesUiModel
 }

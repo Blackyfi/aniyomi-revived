@@ -84,7 +84,7 @@ internal fun LazyListScope.mangaUpdatesUiItems(
         },
         key = {
             when (it) {
-                is MangaUpdatesUiModel.Header -> "mangaUpdatesHeader-${it.hashCode()}"
+                is MangaUpdatesUiModel.Header -> "mangaUpdatesHeader-${it.anchorChapterId}"
                 is MangaUpdatesUiModel.Item -> "mangaUpdates-${it.item.update.mangaId}-${it.item.update.chapterId}"
             }
         },

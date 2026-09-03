@@ -162,6 +162,7 @@ private fun AnimeUpdatesBottomBar(
 }
 
 sealed interface AnimeUpdatesUiModel {
-    data class Header(val date: LocalDate) : AnimeUpdatesUiModel
+    /** @param anchorEpisodeId see [eu.kanade.presentation.updates.manga.MangaUpdatesUiModel.Header]. */
+    data class Header(val date: LocalDate, val anchorEpisodeId: Long) : AnimeUpdatesUiModel
     data class Item(val item: AnimeUpdatesItem) : AnimeUpdatesUiModel
 }
