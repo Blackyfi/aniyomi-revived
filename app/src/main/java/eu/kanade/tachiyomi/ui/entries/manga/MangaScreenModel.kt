@@ -282,6 +282,10 @@ class MangaScreenModel(
             )
             fetchFromSourceTasks.awaitAll()
             updateSuccessState { it.copy(isRefreshingData = false) }
+            // Pull-to-refresh is how you check on the server's progress, so re-read it here
+            // too — otherwise the icons would stay frozen at whatever they were when the
+            // screen opened.
+            loadServerPipelineStates()
         }
     }
 
