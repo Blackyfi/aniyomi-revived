@@ -37,6 +37,8 @@ import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.network.HttpException
+import eu.kanade.tachiyomi.source.ChapterPipelineSource
+import eu.kanade.tachiyomi.source.ChapterPipelineState
 import eu.kanade.tachiyomi.source.MangaSource
 import eu.kanade.tachiyomi.source.MangaSourceInfo
 import eu.kanade.tachiyomi.source.MultiSourceCatalogSource
@@ -252,6 +254,10 @@ class MangaScreenModel(
 
             // Load alternate sources for the picker (no-op for non-multi-source sources)
             loadAvailableSources()
+
+            // Load the server's per-chapter download/upscale progress (no-op for sources
+            // that don't report it)
+            loadServerPipelineStates()
 
             // Fetch info-chapters when needed
             if (screenModelScope.isActive) {
@@ -729,6 +735,30 @@ class MangaScreenModel(
                 // longer pays N sequential per-source reads up front.
             } catch (e: Throwable) {
                 logcat(LogPriority.ERROR, e) { "SourcePicker: Failed to load alternate sources" }
+            }
+        }
+    }
+
+    /**
+     * Loads per-chapter server-side progress (has the server fetched this chapter's pages, has it
+     * upscaled them), if the source reports it. No-op for ordinary sources, which then show no
+     * indicators.
+     *
+     * Best-effort and non-blocking: the chapter list renders immediately from the database and the
+     * indicators appear when this returns. A failure here must never keep chapters off screen, so
+     * everything is swallowed and simply leaves the map empty.
+     */
+    private fun loadServerPipelineStates() {
+        val state = successState ?: return
+        val source = state.source
+        if (source !is ChapterPipelineSource) return
+
+        screenModelScope.launchIO {
+            try {
+                val states = withIOContext { source.getChapterPipelineStates(state.manga.toSManga()) }
+                updateSuccessState { it.copy(serverPipeline = states) }
+            } catch (e: Throwable) {
+                logcat(LogPriority.WARN, e) { "ChapterPipeline: could not load server-side chapter state" }
             }
         }
     }
@@ -1398,6 +1428,10 @@ class MangaScreenModel(
             // Alternate scraper sources for this manga (only for MultiSourceCatalogSource);
             // empty for ordinary sources, which hides the picker.
             val availableSources: List<MangaSourceInfo> = emptyList(),
+            // Server-side progress per chapter, keyed by Chapter.url (only for
+            // ChapterPipelineSource). Empty for ordinary sources, which shows no
+            // indicators at all rather than a row of false negatives.
+            val serverPipeline: Map<String, ChapterPipelineState> = emptyMap(),
             val trackingCount: Int = 0,
             val hasLoggedInTrackers: Boolean = false,
             val isRefreshingData: Boolean = false,
