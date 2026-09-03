@@ -144,7 +144,7 @@ fun MangaChapterListItem(
                     )
                 }
 
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     val subtitleStyle = MaterialTheme.typography.bodySmall
                         .merge(
                             color = LocalContentColor.current
@@ -173,12 +173,16 @@ fun MangaChapterListItem(
                                 text = scanlator,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                // Yield to the indicators: the row is clipToBounds, so an
+                                // unweighted long source name would push them out of sight.
+                                modifier = if (serverPipeline != null) Modifier.weight(1f, fill = false) else Modifier,
                             )
                         }
                         if (serverPipeline != null) {
                             ServerPipelineIndicators(
                                 state = serverPipeline,
                                 dimmed = read,
+                                precededByText = date != null || readProgress != null || scanlator != null,
                             )
                         }
                     }
@@ -266,9 +270,10 @@ private val swipeActionThreshold = 56.dp
 private fun ServerPipelineIndicators(
     state: ChapterPipelineState,
     dimmed: Boolean,
+    precededByText: Boolean,
 ) {
     val baseAlpha = if (dimmed) DISABLED_ALPHA else 1f
-    DotSeparatorText()
+    if (precededByText) DotSeparatorText()
     Row(
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,

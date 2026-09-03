@@ -755,14 +755,34 @@ class MangaScreenModel(
     private fun loadServerPipelineStates() {
         val state = successState ?: return
         val source = state.source
-        if (source !is ChapterPipelineSource) return
+        if (source !is ChapterPipelineSource) {
+            logcat(LogPriority.INFO) {
+                "ChapterPipeline: source does not report chapter state " +
+                    "(id=${source.id}, name=${source.name}, class=${source::class.java.name}) — no indicators"
+            }
+            return
+        }
 
         screenModelScope.launchIO {
             try {
                 val states = withIOContext { source.getChapterPipelineStates(state.manga.toSManga()) }
+                logcat(LogPriority.INFO) {
+                    "ChapterPipeline: ${states.size} chapter state(s) for '${state.manga.title}'"
+                }
                 updateSuccessState { it.copy(serverPipeline = states) }
             } catch (e: Throwable) {
-                logcat(LogPriority.WARN, e) { "ChapterPipeline: could not load server-side chapter state" }
+                if (e is CancellationException) throw e
+                // Recorded, not just logged: this failed silently once already (R8 had
+                // stripped ChapterPipelineState's members, so the extension's constructor
+                // call threw NoSuchMethodError) and nothing surfaced it anywhere.
+                ExtensionErrorStorage.record(
+                    source.id,
+                    source.name,
+                    "Load chapter state",
+                    e,
+                    detail = state.manga.title,
+                )
+                logcat(LogPriority.ERROR, e) { "ChapterPipeline: could not load server-side chapter state" }
             }
         }
     }
@@ -863,6 +883,10 @@ class MangaScreenModel(
                     // 3b) Fallback for extensions without per-source reads: pull the effective list now.
                     fetchChaptersFromSource(manualFetch = false)
                 }
+
+                // 4) The new source has its own chapters, so the old source's server-side
+                // state does not describe them. Re-read it rather than leaving stale icons.
+                loadServerPipelineStates()
             } catch (e: Throwable) {
                 if (e is CancellationException) throw e
                 logcat(LogPriority.ERROR, e) { "SourcePicker: Failed to switch source" }
