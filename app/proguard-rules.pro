@@ -4,6 +4,18 @@
 -keep,allowoptimization class tachiyomi.**
 -keep,allowoptimization class mihon.**
 
+# The source API is the extensions' ABI, and R8 cannot see a single one of its
+# call sites: they live in separately-compiled APKs. The rules above keep the
+# *classes* but leave their members open to optimization, which is not enough —
+# R8 proved that nothing in this app ever constructs ChapterPipelineState, folded
+# both of its properties to their default `false`, and deleted the fields, the
+# getters and the constructor parameters. The class shipped as a members-less
+# shell with only `<init>()V`, so the extension's `ChapterPipelineState(a, b)`
+# threw NoSuchMethodError at runtime and every indicator silently vanished.
+# Keep the members of anything an extension can reach.
+-keep,allowoptimization class eu.kanade.tachiyomi.source.** { public protected *; }
+-keep,allowoptimization class eu.kanade.tachiyomi.animesource.** { public protected *; }
+
 # Keep common dependencies used in extensions
 -keep,allowoptimization class androidx.preference.** { public protected *; }
 -keep,allowoptimization class android.content.** { *; }
