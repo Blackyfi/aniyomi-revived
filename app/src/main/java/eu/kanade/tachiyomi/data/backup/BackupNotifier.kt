@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.R
@@ -40,6 +41,11 @@ class BackupNotifier(private val context: Context) {
         setSmallIcon(R.drawable.ic_ani)
         setAutoCancel(false)
     }
+
+    /**
+     * When the restore progress notification was last posted, in [SystemClock.elapsedRealtime] millis.
+     */
+    private var lastRestoreProgressPostedAt = 0L
 
     private fun NotificationCompat.Builder.show(id: Int) {
         context.notify(id, build())
@@ -86,12 +92,21 @@ class BackupNotifier(private val context: Context) {
         }
     }
 
+    @Synchronized
     fun showRestoreProgress(
         content: String = "",
         progress: Int = 0,
         maxAmount: Int = 100,
         sync: Boolean = false,
     ): NotificationCompat.Builder {
+        // Called once per restored entry, from parallel coroutines. Coalesce the posts: each is a
+        // binder call into system_server, and Android sheds anything past ~5 posts/s per app.
+        val now = SystemClock.elapsedRealtime()
+        if (progress in 1..<maxAmount && now - lastRestoreProgressPostedAt < PROGRESS_THROTTLE_MS) {
+            return progressNotificationBuilder
+        }
+        lastRestoreProgressPostedAt = now
+
         val builder = with(progressNotificationBuilder) {
             val contentTitle = if (sync) {
                 context.stringResource(MR.strings.syncing_library)
@@ -184,5 +199,9 @@ class BackupNotifier(private val context: Context) {
 
             show(Notifications.ID_RESTORE_COMPLETE)
         }
+    }
+
+    private companion object {
+        const val PROGRESS_THROTTLE_MS = 500L
     }
 }

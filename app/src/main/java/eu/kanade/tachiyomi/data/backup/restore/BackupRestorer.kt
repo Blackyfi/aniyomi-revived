@@ -33,6 +33,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 class BackupRestorer(
     private val context: Context,
@@ -51,8 +53,11 @@ class BackupRestorer(
 ) {
 
     private var restoreAmount = 0
-    private var restoreProgress = 0
-    private val errors = mutableListOf<Pair<Date, String>>()
+
+    // The restore steps below run as parallel coroutines on the worker's multi-threaded dispatcher,
+    // so the shared progress counter and error list must be thread-safe.
+    private val restoreProgress = AtomicInteger(0)
+    private val errors = CopyOnWriteArrayList<Pair<Date, String>>()
 
     /**
      * Mapping of source ID to source name from backup data
@@ -148,10 +153,10 @@ class BackupRestorer(
         animeCategoriesRestorer(backupAnimeCategories)
         mangaCategoriesRestorer(backupMangaCategories)
 
-        restoreProgress += 1
+        val progress = restoreProgress.incrementAndGet()
         notifier.showRestoreProgress(
             context.stringResource(MR.strings.categories),
-            restoreProgress,
+            progress,
             restoreAmount,
             isSync,
         )
@@ -166,6 +171,8 @@ class BackupRestorer(
         // aren't silently dropped.
         val backupAnimeIds = backupAnimes.mapNotNull { it.id }.toSet()
         val topLevelAnimes = backupAnimes.filter { it.parentId == null || it.parentId !in backupAnimeIds }
+        // Group seasons by parent once instead of re-scanning the whole backup for every entry.
+        val seasonsByParentId = backupAnimes.filter { it.parentId != null }.groupBy { it.parentId }
 
         animeRestorer.sortByNew(topLevelAnimes)
             .forEach {
@@ -175,7 +182,7 @@ class BackupRestorer(
                 val seasons = if (it.id == null) {
                     emptyList()
                 } else {
-                    backupAnimes.filter { s -> s.parentId == it.id }
+                    seasonsByParentId[it.id].orEmpty()
                 }
                 try {
                     animeRestorer.restore(it, backupAnimeCategories, seasons)
@@ -186,8 +193,8 @@ class BackupRestorer(
 
                 // Seasons are restored within restore() above but counted in restoreAmount,
                 // so advance progress by the parent plus all of its seasons.
-                restoreProgress += 1 + seasons.size
-                notifier.showRestoreProgress(it.title, restoreProgress, restoreAmount, isSync)
+                val progress = restoreProgress.addAndGet(1 + seasons.size)
+                notifier.showRestoreProgress(it.title, progress, restoreAmount, isSync)
             }
     }
 
@@ -206,8 +213,8 @@ class BackupRestorer(
                     errors.add(Date() to "${it.title} [$sourceName]: ${e.message}")
                 }
 
-                restoreProgress += 1
-                notifier.showRestoreProgress(it.title, restoreProgress, restoreAmount, isSync)
+                val progress = restoreProgress.incrementAndGet()
+                notifier.showRestoreProgress(it.title, progress, restoreAmount, isSync)
             }
     }
 
@@ -221,10 +228,10 @@ class BackupRestorer(
             categories,
         )
 
-        restoreProgress += 1
+        val progress = restoreProgress.incrementAndGet()
         notifier.showRestoreProgress(
             context.stringResource(MR.strings.app_settings),
-            restoreProgress,
+            progress,
             restoreAmount,
             isSync,
         )
@@ -234,10 +241,10 @@ class BackupRestorer(
         ensureActive()
         preferenceRestorer.restoreSource(preferences)
 
-        restoreProgress += 1
+        val progress = restoreProgress.incrementAndGet()
         notifier.showRestoreProgress(
             context.stringResource(MR.strings.source_settings),
-            restoreProgress,
+            progress,
             restoreAmount,
             isSync,
         )
@@ -257,10 +264,10 @@ class BackupRestorer(
                     errors.add(Date() to "Error Adding Anime Repo: ${it.name} : ${e.message}")
                 }
 
-                restoreProgress += 1
+                val progress = restoreProgress.incrementAndGet()
                 notifier.showRestoreProgress(
                     context.stringResource(MR.strings.extensionRepo_settings),
-                    restoreProgress,
+                    progress,
                     restoreAmount,
                     isSync,
                 )
@@ -276,10 +283,10 @@ class BackupRestorer(
                     errors.add(Date() to "Error Adding Manga Repo: ${it.name} : ${e.message}")
                 }
 
-                restoreProgress += 1
+                val progress = restoreProgress.incrementAndGet()
                 notifier.showRestoreProgress(
                     context.stringResource(MR.strings.extensionRepo_settings),
-                    restoreProgress,
+                    progress,
                     restoreAmount,
                     isSync,
                 )
@@ -290,10 +297,10 @@ class BackupRestorer(
         ensureActive()
         customButtonRestorer(customButtons)
 
-        restoreProgress += 1
+        val progress = restoreProgress.incrementAndGet()
         notifier.showRestoreProgress(
             context.stringResource(AYMR.strings.custom_button_settings),
-            restoreProgress,
+            progress,
             restoreAmount,
             isSync,
         )
@@ -303,10 +310,10 @@ class BackupRestorer(
         ensureActive()
         extensionsRestorer.restoreExtensions(extensions)
 
-        restoreProgress += 1
+        val progress = restoreProgress.incrementAndGet()
         notifier.showRestoreProgress(
             context.stringResource(MR.strings.source_settings),
-            restoreProgress,
+            progress,
             restoreAmount,
             isSync,
         )
