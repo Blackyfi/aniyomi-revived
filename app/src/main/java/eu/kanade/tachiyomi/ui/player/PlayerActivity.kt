@@ -318,7 +318,12 @@ class PlayerActivity : BaseActivity() {
         if (torrentServerStarted) {
             TorrentServerService.stop(this)
             torrentServerStarted = false
+        } else if (TorrentServerService.isPlayerAttached) {
+            // The server was requested but never answered in time; don't leave it running if it
+            // comes up after the player is gone.
+            TorrentServerService.scheduleIdleStop(this)
         }
+        TorrentServerService.isPlayerAttached = false
 
         super.onDestroy()
     }
@@ -337,6 +342,8 @@ class PlayerActivity : BaseActivity() {
      * @return true if the server responded within the timeout, false otherwise.
      */
     fun ensureTorrentServerRunning(): Boolean {
+        TorrentServerService.isPlayerAttached = true
+        TorrentServerService.cancelIdleStop()
         if (!TorrentServerService.isRunning) {
             logcat(LogPriority.INFO) { "[Torrent] player requesting torrent server start" }
             TorrentServerService.start(this)
