@@ -225,14 +225,20 @@ actual class LocalAnimeSource(
 
     // Episodes
     override suspend fun getEpisodeList(anime: SAnime): List<SEpisode> = withIOContext {
-        val episodesData = fileSystem.getFilesInAnimeDirectory(anime.url)
+        // List the directory once: on SAF storage every listing is a slow ContentResolver query.
+        val animeDirFiles = fileSystem.getFilesInAnimeDirectory(anime.url)
+        val existingThumbnails = animeDirFiles
+            .filter { it.name.orEmpty().endsWith(DEFAULT_THUMBNAIL_NAME, ignoreCase = true) && it.isFile }
+            .associateBy { it.name.orEmpty().lowercase() }
+
+        val episodesData = animeDirFiles
             .firstOrNull {
                 it.extension == "json" && it.nameWithoutExtension == "episodes"
             }?.let { file ->
                 json.decodeFromStream<List<EpisodeDetails>>(file.openInputStream())
             }
 
-        val episodes = fileSystem.getFilesInAnimeDirectory(anime.url)
+        val episodes = animeDirFiles
             // Only keep supported formats
             .filterNot { it.name.orEmpty().startsWith('.') }
             .filter { ArchiveAnime.isSupported(it) }
@@ -258,6 +264,13 @@ actual class LocalAnimeSource(
                             summary = data.summary
                         }
                     }
+
+                    // Reuse the preview generated on an earlier refresh. The episode is rebuilt from
+                    // the file listing every time, so preview_url alone is always null here and the
+                    // video would otherwise be decoded with FFmpeg again on each refresh.
+                    existingThumbnails["${this.name}-$DEFAULT_THUMBNAIL_NAME".lowercase()]
+                        ?.takeIf { it.length() > 0 }
+                        ?.let { preview_url = it.uri.toString() }
 
                     // Generate the preview from the episode if not available
                     if (this.preview_url == null) {
