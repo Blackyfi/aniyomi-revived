@@ -56,10 +56,11 @@ class AddAnimeTracks(
                 }
 
                 if (track.startDate <= 0) {
+                    // Reset history keeps its row with a zero date; skip those, or the
+                    // tracker's start date would become 1970-01-01.
                     val firstReadChapterDate = Injekt.get<GetAnimeHistory>().await(animeId)
-                        .sortedBy { it.seenAt }
-                        .firstOrNull()
-                        ?.seenAt
+                        .mapNotNull { it.seenAt?.takeIf { seenAt -> seenAt.time > 0 } }
+                        .minOrNull()
 
                     firstReadChapterDate?.let {
                         val startDate = firstReadChapterDate.time.convertEpochMillisZone(
