@@ -8,23 +8,21 @@ import eu.kanade.tachiyomi.data.track.TrackerOAuthState
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALAnime
+import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALAnimeSearchResult
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALListAnimeItem
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALListAnimeItemStatus
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALListMangaItem
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALListMangaItemStatus
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALManga
+import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALMangaSearchResult
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALOAuth
-import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALSearchResult
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALUser
-import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALUserSearchResult
 import eu.kanade.tachiyomi.network.DELETE
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.parseAs
 import eu.kanade.tachiyomi.util.PkceUtil
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.Headers
@@ -85,15 +83,17 @@ class MyAnimeListApi(
                 // MAL API throws a 400 when the query is over 64 characters...
                 .appendQueryParameter("q", query.take(64))
                 .appendQueryParameter("nsfw", "true")
+                // Ask for the details up front: fetching them per result made each search
+                // one request plus one more for every hit.
+                .appendQueryParameter("fields", MANGA_FIELDS)
                 .build()
             with(json) {
                 authClient.newCall(GET(url.toString()))
                     .awaitSuccess()
-                    .parseAs<MALSearchResult>()
+                    .parseAs<MALMangaSearchResult>()
                     .data
-                    .map { async { getMangaDetails(it.node.id) } }
-                    .awaitAll()
-                    .filter { !it.publishing_type.contains("novel") }
+                    .filter { !it.node.mediaType.contains("novel") }
+                    .map { parseMangaSearchItem(it.node) }
             }
         }
     }
@@ -104,14 +104,14 @@ class MyAnimeListApi(
                 // MAL API throws a 400 when the query is over 64 characters...
                 .appendQueryParameter("q", query.take(64))
                 .appendQueryParameter("nsfw", "true")
+                .appendQueryParameter("fields", ANIME_FIELDS)
                 .build()
             with(json) {
                 authClient.newCall(GET(url.toString()))
                     .awaitSuccess()
-                    .parseAs<MALSearchResult>()
+                    .parseAs<MALAnimeSearchResult>()
                     .data
-                    .map { async { getAnimeDetails(it.node.id) } }
-                    .awaitAll()
+                    .map { parseAnimeSearchItem(it.node) }
             }
         }
     }
@@ -120,29 +120,13 @@ class MyAnimeListApi(
         return withIOContext {
             val url = "$BASE_API_URL/manga".toUri().buildUpon()
                 .appendPath(id.toString())
-                .appendQueryParameter(
-                    "fields",
-                    "id,title,synopsis,num_chapters,mean,main_picture,status,media_type,start_date",
-                )
+                .appendQueryParameter("fields", MANGA_FIELDS)
                 .build()
             with(json) {
                 authClient.newCall(GET(url.toString()))
                     .awaitSuccess()
                     .parseAs<MALManga>()
-                    .let {
-                        MangaTrackSearch.create(trackId).apply {
-                            remote_id = it.id
-                            title = it.title
-                            summary = it.synopsis
-                            total_chapters = it.numChapters
-                            score = it.mean
-                            cover_url = it.covers?.large.orEmpty()
-                            tracking_url = "https://myanimelist.net/manga/$remote_id"
-                            publishing_status = it.status.replace("_", " ")
-                            publishing_type = it.mediaType.replace("_", " ")
-                            start_date = it.startDate ?: ""
-                        }
-                    }
+                    .let { parseMangaSearchItem(it) }
             }
         }
     }
@@ -151,30 +135,44 @@ class MyAnimeListApi(
         return withIOContext {
             val url = "$BASE_API_URL/anime".toUri().buildUpon()
                 .appendPath(id.toString())
-                .appendQueryParameter(
-                    "fields",
-                    "id,title,synopsis,num_episodes,mean,main_picture,status,media_type,start_date",
-                )
+                .appendQueryParameter("fields", ANIME_FIELDS)
                 .build()
             with(json) {
                 authClient.newCall(GET(url.toString()))
                     .awaitSuccess()
                     .parseAs<MALAnime>()
-                    .let {
-                        AnimeTrackSearch.create(trackId).apply {
-                            remote_id = it.id
-                            title = it.title
-                            summary = it.synopsis
-                            total_episodes = it.numEpisodes
-                            score = it.mean
-                            cover_url = it.covers?.large.orEmpty()
-                            tracking_url = "https://myanimelist.net/anime/$remote_id"
-                            publishing_status = it.status.replace("_", " ")
-                            publishing_type = it.mediaType.replace("_", " ")
-                            start_date = it.startDate ?: ""
-                        }
-                    }
+                    .let { parseAnimeSearchItem(it) }
             }
+        }
+    }
+
+    private fun parseMangaSearchItem(item: MALManga): MangaTrackSearch {
+        return MangaTrackSearch.create(trackId).apply {
+            remote_id = item.id
+            title = item.title
+            summary = item.synopsis
+            total_chapters = item.numChapters
+            score = item.mean
+            cover_url = item.covers?.large.orEmpty()
+            tracking_url = "https://myanimelist.net/manga/$remote_id"
+            publishing_status = item.status.replace("_", " ")
+            publishing_type = item.mediaType.replace("_", " ")
+            start_date = item.startDate ?: ""
+        }
+    }
+
+    private fun parseAnimeSearchItem(item: MALAnime): AnimeTrackSearch {
+        return AnimeTrackSearch.create(trackId).apply {
+            remote_id = item.id
+            title = item.title
+            summary = item.synopsis
+            total_episodes = item.numEpisodes
+            score = item.mean
+            cover_url = item.covers?.large.orEmpty()
+            tracking_url = "https://myanimelist.net/anime/$remote_id"
+            publishing_status = item.status.replace("_", " ")
+            publishing_type = item.mediaType.replace("_", " ")
+            start_date = item.startDate ?: ""
         }
     }
 
@@ -286,15 +284,14 @@ class MyAnimeListApi(
 
     suspend fun findListItems(query: String, offset: Int = 0): List<MangaTrackSearch> {
         return withIOContext {
-            val myListSearchResult = getListPage(offset)
+            val myListSearchResult = getMangaListPage(offset)
 
             val matches = myListSearchResult.data
                 .filter { it.node.title.contains(query, ignoreCase = true) }
-                .map { async { getMangaDetails(it.node.id) } }
-                .awaitAll()
+                .map { parseMangaSearchItem(it.node) }
 
             // Check next page if there's more
-            if (!myListSearchResult.paging.next.isNullOrBlank()) {
+            if (!myListSearchResult.paging?.next.isNullOrBlank()) {
                 matches + findListItems(query, offset + LIST_PAGINATION_AMOUNT)
             } else {
                 matches
@@ -304,15 +301,14 @@ class MyAnimeListApi(
 
     suspend fun findListItemsAnime(query: String, offset: Int = 0): List<AnimeTrackSearch> {
         return withIOContext {
-            val myListSearchResult = getListPage(offset, "animelist")
+            val myListSearchResult = getAnimeListPage(offset)
 
             val matches = myListSearchResult.data
                 .filter { it.node.title.contains(query, ignoreCase = true) }
-                .map { async { getAnimeDetails(it.node.id) } }
-                .awaitAll()
+                .map { parseAnimeSearchItem(it.node) }
 
             // Check next page if there's more
-            if (!myListSearchResult.paging.next.isNullOrBlank()) {
+            if (!myListSearchResult.paging?.next.isNullOrBlank()) {
                 matches + findListItemsAnime(query, offset + LIST_PAGINATION_AMOUNT)
             } else {
                 matches
@@ -320,25 +316,37 @@ class MyAnimeListApi(
         }
     }
 
-    private suspend fun getListPage(offset: Int, listType: String = "mangalist"): MALUserSearchResult {
+    private suspend fun getMangaListPage(offset: Int): MALMangaSearchResult {
         return withIOContext {
-            val urlBuilder = "$BASE_API_URL/users/@me/$listType".toUri().buildUpon()
-                .appendQueryParameter("fields", "list_status{start_date,finish_date}")
-                .appendQueryParameter("limit", LIST_PAGINATION_AMOUNT.toString())
-            if (offset > 0) {
-                urlBuilder.appendQueryParameter("offset", offset.toString())
-            }
-
-            val request = Request.Builder()
-                .url(urlBuilder.build().toString())
-                .get()
-                .build()
             with(json) {
-                authClient.newCall(request)
+                authClient.newCall(listPageRequest("mangalist", MANGA_FIELDS, offset))
                     .awaitSuccess()
                     .parseAs()
             }
         }
+    }
+
+    private suspend fun getAnimeListPage(offset: Int): MALAnimeSearchResult {
+        return withIOContext {
+            with(json) {
+                authClient.newCall(listPageRequest("animelist", ANIME_FIELDS, offset))
+                    .awaitSuccess()
+                    .parseAs()
+            }
+        }
+    }
+
+    private fun listPageRequest(listType: String, fields: String, offset: Int): Request {
+        val urlBuilder = "$BASE_API_URL/users/@me/$listType".toUri().buildUpon()
+            .appendQueryParameter("fields", fields)
+            .appendQueryParameter("limit", LIST_PAGINATION_AMOUNT.toString())
+        if (offset > 0) {
+            urlBuilder.appendQueryParameter("offset", offset.toString())
+        }
+        return Request.Builder()
+            .url(urlBuilder.build().toString())
+            .get()
+            .build()
     }
 
     private fun parseMangaItem(listStatus: MALListMangaItemStatus, track: MangaTrack): MangaTrack {
@@ -386,6 +394,11 @@ class MyAnimeListApi(
         private const val BASE_API_URL = "https://api.myanimelist.net/v2"
 
         private const val LIST_PAGINATION_AMOUNT = 250
+
+        private const val MANGA_FIELDS =
+            "id,title,synopsis,num_chapters,mean,main_picture,status,media_type,start_date"
+        private const val ANIME_FIELDS =
+            "id,title,synopsis,num_episodes,mean,main_picture,status,media_type,start_date"
 
         private var codeVerifier: String = ""
 
