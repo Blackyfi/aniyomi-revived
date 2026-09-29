@@ -191,10 +191,17 @@ abstract class AnimeSearchScreenModel(
     }
 
     private fun updateItem(source: AnimeCatalogueSource, result: AnimeSearchItemResult) {
-        val newItems = state.value.items.mutate {
-            it[source] = result
+        // Read-modify-write inside update {}: sources finish concurrently, and building the new map
+        // from a separate state.value read let one source's result overwrite another's, leaving
+        // that source stuck on its loading indicator.
+        mutableState.update { state ->
+            val newItems = state.items.mutate { it[source] = result }
+            state.copy(
+                items = newItems
+                    .toSortedMap(sortComparator(newItems))
+                    .toPersistentMap(),
+            )
         }
-        updateItems(newItems)
     }
 
     @Immutable
