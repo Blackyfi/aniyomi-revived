@@ -159,6 +159,8 @@ class MainActivity : BaseActivity() {
 
         super.onCreate(savedInstanceState)
 
+        lifecycle.addObserver(MainUiVisibility.lifecycleObserver)
+
         lifecycleScope.launchIO {
             val result = Migrator.awaitAndRelease()
             withUIContext {
