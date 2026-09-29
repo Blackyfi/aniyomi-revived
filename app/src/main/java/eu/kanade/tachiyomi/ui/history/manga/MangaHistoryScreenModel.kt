@@ -8,6 +8,7 @@ import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.entries.manga.interactor.UpdateManga
 import eu.kanade.domain.track.manga.interactor.AddMangaTracks
 import eu.kanade.presentation.history.manga.MangaHistoryUiModel
+import eu.kanade.tachiyomi.ui.main.whileMainUiVisible
 import eu.kanade.tachiyomi.util.lang.toLocalDate
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -74,6 +75,7 @@ class MangaHistoryScreenModel(
         screenModelScope.launch {
             _query.collectLatest { query ->
                 getHistory.subscribe(query ?: "")
+                    .whileMainUiVisible()
                     .distinctUntilChanged()
                     .catch { error ->
                         logcat(LogPriority.ERROR, error)

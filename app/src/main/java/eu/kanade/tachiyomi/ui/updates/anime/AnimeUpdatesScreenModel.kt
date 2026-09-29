@@ -16,6 +16,7 @@ import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
+import eu.kanade.tachiyomi.ui.main.whileMainUiVisible
 import eu.kanade.tachiyomi.util.lang.toLocalDate
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.mutate
@@ -79,7 +80,7 @@ class AnimeUpdatesScreenModel(
 
             val limit = ZonedDateTime.now().minusMonths(3).toInstant()
             combine(
-                getUpdates.subscribe(limit).distinctUntilChanged(),
+                getUpdates.subscribe(limit).whileMainUiVisible().distinctUntilChanged(),
                 downloadCache.changes,
                 downloadManager.queueState,
             ) { updates, _, _ -> updates }
