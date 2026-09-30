@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -20,10 +21,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.browse.components.GetExtensionsHint
 import eu.kanade.presentation.browse.manga.components.BaseMangaSourceItem
 import eu.kanade.tachiyomi.ui.browse.manga.source.MangaSourcesScreenModel
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreenModel.Listing
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.domain.source.manga.model.Pin
 import tachiyomi.domain.source.manga.model.Source
 import tachiyomi.i18n.MR
@@ -34,6 +37,7 @@ import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.components.material.topSmallPaddingValues
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
+import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.presentation.core.theme.header
 import tachiyomi.presentation.core.util.plus
@@ -46,17 +50,36 @@ fun MangaSourcesScreen(
     onClickItem: (Source, Listing) -> Unit,
     onClickPin: (Source) -> Unit,
     onLongClickItem: (Source) -> Unit,
+    onClickGetExtensions: () -> Unit,
 ) {
     when {
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
         state.isEmpty -> EmptyScreen(
-            stringRes = MR.strings.source_empty_screen,
+            stringRes = AYMR.strings.information_install_extensions_hint,
             modifier = Modifier.padding(contentPadding),
+            actions = persistentListOf(
+                EmptyScreenAction(
+                    stringRes = AYMR.strings.action_get_extensions,
+                    icon = Icons.Outlined.Extension,
+                    onClick = onClickGetExtensions,
+                ),
+            ),
         )
         else -> {
             ScrollbarLazyColumn(
                 contentPadding = contentPadding + topSmallPaddingValues,
             ) {
+                val hasExtensionSources = state.items.any {
+                    it is MangaSourceUiModel.Item && it.source.id != LocalMangaSource.ID
+                }
+                if (!hasExtensionSources) {
+                    item(key = "get-extensions-hint", contentType = "hint") {
+                        GetExtensionsHint(
+                            onClickGetExtensions = onClickGetExtensions,
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
                 items(
                     items = state.items,
                     contentType = {
