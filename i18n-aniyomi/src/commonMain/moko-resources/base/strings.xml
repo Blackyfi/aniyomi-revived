@@ -636,4 +636,10 @@
     <string name="action_find_something_to_read">Find something to read</string>
     <string name="action_find_something_to_watch">Find something to watch</string>
     <string name="information_no_extensions_available">No extensions to show. Check your extension repos, then pull down to refresh.</string>
+    <!-- Friendlier network errors -->
+    <string name="exception_timeout">The source took too long to respond. Try again in a moment</string>
+    <string name="exception_connect">Couldn\'t connect to the source. It may be down or blocked on this network</string>
+    <string name="exception_ssl">Secure connection to the source failed. Check the device\'s date and time, or try again later</string>
+    <string name="exception_http_too_many_requests">The source is limiting requests (HTTP 429). Wait a bit, then try again</string>
+    <string name="exception_http_server_error">The source\'s server had a problem (HTTP %d). Try again later</string>
 </resources>

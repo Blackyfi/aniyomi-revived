@@ -21,6 +21,7 @@ import androidx.work.workDataOf
 import eu.kanade.domain.entries.manga.interactor.UpdateManga
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
+import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.notification.Notifications
@@ -324,7 +325,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                             is SourceNotInstalledException -> context.stringResource(
                                                 MR.strings.loader_not_implemented_error,
                                             )
-                                            else -> e.message
+                                            else -> with(context) { e.formattedMessage }
                                         }
                                         failedUpdates.add(manga to errorMessage)
                                     }

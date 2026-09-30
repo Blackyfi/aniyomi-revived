@@ -21,6 +21,7 @@ import androidx.work.workDataOf
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.domain.entries.anime.model.toSAnime
 import eu.kanade.domain.items.episode.interactor.SyncEpisodesWithSource
+import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.animesource.model.AnimeUpdateStrategy
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.model.SAnime
@@ -346,7 +347,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                             is AnimeSourceNotInstalledException -> context.stringResource(
                                                 MR.strings.loader_not_implemented_error,
                                             )
-                                            else -> e.message
+                                            else -> with(context) { e.formattedMessage }
                                         }
                                         failedUpdates.add(anime to errorMessage)
                                     }
