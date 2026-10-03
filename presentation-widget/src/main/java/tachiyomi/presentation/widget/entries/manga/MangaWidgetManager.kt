@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.onEach
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.updates.manga.interactor.GetMangaUpdates
+import tachiyomi.presentation.widget.util.WidgetPresence
 
 class MangaWidgetManager(
     private val getUpdates: GetMangaUpdates,
@@ -20,11 +21,18 @@ class MangaWidgetManager(
 ) {
 
     fun Context.init(scope: LifecycleCoroutineScope) {
+        val updates = WidgetPresence.run {
+            whileAnyPlaced(
+                MangaUpdatesGridGlanceReceiver::class.java,
+                MangaUpdatesGridCoverScreenGlanceReceiver::class.java,
+                flow = getUpdates.subscribe(
+                    read = false,
+                    after = BaseMangaUpdatesGridGlanceWidget.DateLimit.toEpochMilli(),
+                ),
+            )
+        }
         combine(
-            getUpdates.subscribe(
-                read = false,
-                after = BaseMangaUpdatesGridGlanceWidget.DateLimit.toEpochMilli(),
-            ),
+            updates,
             securityPreferences.useAuthenticator().changes(),
             transform = { a, b -> a to b },
         )
