@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import android.os.Looper
 import android.webkit.WebView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -243,11 +242,14 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     override fun getPackageName(): String {
         try {
-            // Override the value passed as X-Requested-With in WebView requests
-            val stackTrace = Looper.getMainLooper().thread.stackTrace
+            // Override the value passed as X-Requested-With in WebView requests.
+            // Inspect the calling thread's own stack. Reading the main thread's stack from here
+            // (as before) made every getPackageName() call on a background thread pause the UI
+            // thread to walk its stack, and looked at the wrong thread for the Chromium caller.
+            val stackTrace = Thread.currentThread().stackTrace
             val isChromiumCall = stackTrace.any { trace ->
-                trace.className.equals("org.chromium.base.BuildInfo", ignoreCase = true) &&
-                    setOf("getAll", "getPackageName", "<init>").any { trace.methodName.equals(it, ignoreCase = true) }
+                CHROMIUM_INFO_CLASSES.any { trace.className.equals(it, ignoreCase = true) } &&
+                    CHROMIUM_INFO_METHODS.any { trace.methodName.equals(it, ignoreCase = true) }
             }
 
             if (isChromiumCall) return WebViewUtil.spoofedPackageName(applicationContext)
@@ -294,3 +296,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 }
 
 private const val ACTION_DISABLE_INCOGNITO_MODE = "tachi.action.DISABLE_INCOGNITO_MODE"
+
+// Chromium reads the app's package name through these to build the X-Requested-With header.
+private val CHROMIUM_INFO_CLASSES = arrayOf("org.chromium.base.BuildInfo", "org.chromium.base.ApkInfo")
+private val CHROMIUM_INFO_METHODS = arrayOf("getAll", "getPackageName", "<init>")
