@@ -14,6 +14,28 @@ plugins {
 
 shortcutHelper.setFilePath("./shortcuts.xml")
 
+/**
+ * The Android locale qualifiers the app has translations for, read from the i18n modules so the
+ * list follows new translations automatically.
+ */
+fun appLocales(): Set<String> {
+    val locales = listOf("i18n", "i18n-aniyomi")
+        .flatMap { module ->
+            rootProject.file("$module/src/commonMain/moko-resources")
+                .listFiles { file -> file.isDirectory }
+                .orEmpty()
+                .map { it.name }
+        }
+        .map { if (it == "base") "en" else it }
+        .toMutableSet()
+    // Android still resolves some languages through their legacy codes; keep both spellings.
+    val aliases = mapOf("he" to "iw", "in" to "id", "nb-rNO" to "nb")
+    aliases.forEach { (code, alias) -> if (code in locales) locales += alias }
+    // Pseudo-locales used by the debug build (isPseudoLocalesEnabled).
+    locales += listOf("en-rXA", "ar-rXB")
+    return locales
+}
+
 android {
     namespace = "eu.kanade.tachiyomi"
 
@@ -41,6 +63,10 @@ android {
         // buildConfigField("String", "ACRA_PASSWORD", "\"$acraPassword\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Ship only the languages the app is translated into. Dependencies (AndroidX, Material,
+        // ...) bundle translations for dozens more, which only bloat resources.arsc.
+        resourceConfigurations += appLocales()
     }
 
     buildTypes {
