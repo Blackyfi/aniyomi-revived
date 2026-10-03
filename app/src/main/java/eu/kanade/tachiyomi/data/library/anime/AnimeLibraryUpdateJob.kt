@@ -99,6 +99,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
     private var animeToUpdate: List<LibraryAnime> = mutableListOf()
 
+    /**
+     * Entries the user's "Smart update" restrictions left out of this run, with the reason.
+     */
+    private var restrictedSkips: List<Pair<Anime, String?>> = emptyList()
+
     override suspend fun doWork(): Result {
         if (tags.contains(WORK_NAME_AUTO)) {
             // Skip this scheduled run if it falls outside the user's daily update window.
@@ -274,8 +279,12 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
         notifier.showQueueSizeWarningNotificationIfNeeded(animeToUpdate)
 
+        // Entries whose source asks to be fetched only once are skipped by design; only the skips
+        // caused by the user's own restrictions are worth telling them about.
+        val notAlwaysUpdate = context.stringResource(MR.strings.skipped_reason_not_always_update)
+        restrictedSkips = skippedUpdates.filter { it.second != notAlwaysUpdate }
+
         if (skippedUpdates.isNotEmpty()) {
-            // TODO: surface skipped reasons to user?
             logcat {
                 skippedUpdates
                     .groupBy { it.second }
@@ -375,6 +384,20 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 errorFile.getUriCompat(context),
             )
         }
+
+        // A manual update that silently leaves entries out looks broken, so say which and why.
+        // Scheduled runs stay quiet.
+        if (restrictedSkips.isNotEmpty() && !tags.contains(WORK_NAME_AUTO)) {
+            val skippedFile = writeErrorFile(
+                restrictedSkips,
+                fileName = "aniyomi_update_skipped.txt",
+                header = context.stringResource(AYMR.strings.library_update_skipped_help),
+            )
+            notifier.showUpdateSkippedNotification(
+                restrictedSkips.size,
+                skippedFile.getUriCompat(context),
+            )
+        }
     }
 
     private fun downloadEpisodes(anime: Anime, episodes: List<Episode>) {
@@ -438,14 +461,16 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     /**
      * Writes basic file of update errors to cache dir.
      */
-    private fun writeErrorFile(errors: List<Pair<Anime, String?>>): File {
+    private fun writeErrorFile(
+        errors: List<Pair<Anime, String?>>,
+        fileName: String = "aniyomi_update_errors.txt",
+        header: String = context.stringResource(MR.strings.library_errors_help, ERROR_LOG_HELP_URL),
+    ): File {
         try {
             if (errors.isNotEmpty()) {
-                val file = context.createFileInCacheDir("aniyomi_update_errors.txt")
+                val file = context.createFileInCacheDir(fileName)
                 file.bufferedWriter().use { out ->
-                    out.write(
-                        context.stringResource(MR.strings.library_errors_help, ERROR_LOG_HELP_URL) + "\n\n",
-                    )
+                    out.write(header + "\n\n")
                     // Error file format:
                     // ! Error
                     //   # Source

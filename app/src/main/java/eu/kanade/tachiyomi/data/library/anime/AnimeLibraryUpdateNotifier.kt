@@ -30,6 +30,7 @@ import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.getBitmapOrNull
 import eu.kanade.tachiyomi.util.system.notificationBuilder
 import eu.kanade.tachiyomi.util.system.notify
+import tachiyomi.core.common.i18n.pluralStringResource
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchUI
 import tachiyomi.domain.entries.anime.model.Anime
@@ -185,6 +186,26 @@ class AnimeLibraryUpdateNotifier(
         ) {
             setContentTitle(context.stringResource(MR.strings.notification_update_error, failed))
             setContentText(context.stringResource(MR.strings.action_show_errors))
+            setSmallIcon(R.drawable.ic_ani)
+
+            setContentIntent(NotificationReceiver.openErrorLogPendingActivity(context, uri))
+        }
+    }
+
+    /**
+     * Tells the user a manual update left out [skipped] entries because of their restrictions.
+     *
+     * @param uri Uri of the log listing the skipped entries and why.
+     */
+    fun showUpdateSkippedNotification(skipped: Int, uri: Uri) {
+        context.notify(
+            Notifications.ID_LIBRARY_SKIPPED,
+            Notifications.CHANNEL_LIBRARY_ERROR,
+        ) {
+            setContentTitle(
+                context.pluralStringResource(AYMR.plurals.notification_update_skipped, skipped, skipped),
+            )
+            setContentText(context.stringResource(AYMR.strings.notification_update_skipped_text))
             setSmallIcon(R.drawable.ic_ani)
 
             setContentIntent(NotificationReceiver.openErrorLogPendingActivity(context, uri))
