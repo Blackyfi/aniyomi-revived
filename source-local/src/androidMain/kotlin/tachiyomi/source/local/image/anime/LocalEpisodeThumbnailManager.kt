@@ -5,7 +5,6 @@ import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.util.storage.DiskUtil
-import tachiyomi.core.common.storage.nameWithoutExtension
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.source.local.io.anime.LocalAnimeSourceFileSystem
 import java.io.InputStream
@@ -19,8 +18,10 @@ actual class LocalEpisodeThumbnailManager(
 
     actual fun find(animeUrl: String, fileName: String): UniFile? {
         return fileSystem.getFilesInAnimeDirectory(animeUrl)
-            // Get all file whose names contain the episode name and the word 'thumbnail'
-            .filter { it.isFile && it.nameWithoutExtension.equals(fileName, ignoreCase = true) }
+            // fileName carries its extension ("<episode>-thumbnail.jpg"), so match the full name.
+            // Comparing it against nameWithoutExtension never matched, which made update() create
+            // a fresh file on every refresh instead of overwriting the existing thumbnail.
+            .filter { it.isFile && it.name.equals(fileName, ignoreCase = true) }
             // Get the first actual image
             .firstOrNull { ImageUtil.isImage(it.name) { it.openInputStream() } }
     }

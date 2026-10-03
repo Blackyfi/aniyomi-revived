@@ -904,9 +904,11 @@ class PlayerViewModel @JvmOverloads constructor(
         inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0)
     }
 
-    private val doubleTapToSeekDuration = gesturePreferences.skipLengthPreference().get()
-    private val preciseSeek = gesturePreferences.playerSmoothSeek().get()
-    private val showSeekBar = gesturePreferences.showSeekBar().get()
+    // Read on every seek rather than once at construction: these can be changed from the
+    // in-player settings sheet and must apply without reopening the player.
+    private val doubleTapToSeekDuration get() = gesturePreferences.skipLengthPreference().get()
+    private val preciseSeek get() = gesturePreferences.playerSmoothSeek().get()
+    private val showSeekBar get() = gesturePreferences.showSeekBar().get()
 
     private fun seekToWithText(seekValue: Int, text: String?) {
         _isSeekingForwards.value = seekValue > 0
