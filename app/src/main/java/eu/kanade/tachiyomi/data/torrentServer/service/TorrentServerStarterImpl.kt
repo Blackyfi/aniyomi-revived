@@ -15,7 +15,12 @@ class TorrentServerStarterImpl(private val context: Context) : TorrentServerStar
         if (!TorrentServerService.isRunning) {
             TorrentServerService.start(context)
         }
-        return TorrentServerService.wait(WAIT_SECONDS)
+        val ready = TorrentServerService.wait(WAIT_SECONDS)
+        // Nothing here is playback: shut the server down again if no player picks it up.
+        if (!TorrentServerService.isPlayerAttached) {
+            TorrentServerService.scheduleIdleStop(context)
+        }
+        return ready
     }
 
     private companion object {

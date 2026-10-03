@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
@@ -151,6 +154,42 @@ class TorrentServerService : Service() {
         @Volatile
         var isRunning = false
             private set
+
+        /**
+         * Whether a player is currently streaming through the server. The idle stop never fires
+         * while this is set; the player stops the server itself when it closes.
+         */
+        @Volatile
+        var isPlayerAttached = false
+
+        // Extensions start the server to read a torrent's file list while the episode list is being
+        // built, long before (and often without) any playback. Without an idle stop that leaves a
+        // foreground service and the P2P engine running until the process dies.
+        private const val IDLE_STOP_DELAY_MS = 5 * 60 * 1000L
+        private val IDLE_STOP_TOKEN = Any()
+        private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+        /**
+         * (Re)arms a delayed stop of the server, unless a player attaches before it fires.
+         */
+        fun scheduleIdleStop(context: Context) {
+            val appContext = context.applicationContext
+            mainHandler.removeCallbacksAndMessages(IDLE_STOP_TOKEN)
+            mainHandler.postAtTime(
+                {
+                    if (isRunning && !isPlayerAttached) {
+                        logcat(LogPriority.INFO) { "[Torrent] stopping idle server" }
+                        stop(appContext)
+                    }
+                },
+                IDLE_STOP_TOKEN,
+                SystemClock.uptimeMillis() + IDLE_STOP_DELAY_MS,
+            )
+        }
+
+        fun cancelIdleStop() {
+            mainHandler.removeCallbacksAndMessages(IDLE_STOP_TOKEN)
+        }
 
         @Suppress("TooGenericExceptionCaught")
         fun start(context: Context) {

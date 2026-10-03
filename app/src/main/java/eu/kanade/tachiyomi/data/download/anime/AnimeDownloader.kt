@@ -461,10 +461,18 @@ class AnimeDownloader(
 
                     // If videoFile is not existing then download it
                     if (preferences.useExternalDownloader().get() == download.changeDownloader) {
+                        // Re-post the notification only when the percentage moved, and at most
+                        // once per PROGRESS_NOTIFY_INTERVAL_MS. Every post is a binder call into
+                        // system_server, and Android sheds anything past ~5 posts/s per app anyway.
                         progressJob = scope.launch {
+                            var lastNotifiedProgress = download.progress
                             while (download.status == AnimeDownload.State.DOWNLOADING) {
-                                delay(50)
-                                notifier.onProgressChange(download)
+                                delay(PROGRESS_NOTIFY_INTERVAL_MS)
+                                val progress = download.progress
+                                if (progress != lastNotifiedProgress) {
+                                    lastNotifiedProgress = progress
+                                    notifier.onProgressChange(download)
+                                }
                             }
                         }
 
@@ -909,6 +917,9 @@ class AnimeDownloader(
         // cross-source parallelism scales up to the configured slot count. Unmetered sources are
         // exempt from this cap.
         private const val PER_SOURCE_LIMIT = 1
+
+        // How often the progress notification may be refreshed while a video downloads.
+        private const val PROGRESS_NOTIFY_INTERVAL_MS = 1_000L
     }
 }
 

@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.download.anime
 import android.app.PendingIntent
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
@@ -49,6 +50,11 @@ internal class AnimeDownloadNotifier(private val context: Context) {
     private var isDownloading = false
 
     /**
+     * When the progress notification was last posted, in [SystemClock.elapsedRealtime] millis.
+     */
+    private var lastProgressPostedAt = 0L
+
+    /**
      * Shows a notification from this builder.
      *
      * @param id the id of the notification.
@@ -70,7 +76,16 @@ internal class AnimeDownloadNotifier(private val context: Context) {
      *
      * @param download download object containing download information.
      */
+    @Synchronized
     fun onProgressChange(download: AnimeDownload) {
+        // Several downloads report progress concurrently. Each post is a binder call into
+        // system_server and Android drops anything past ~5 posts/s per app, so coalesce them.
+        // The final update of an item always goes through so the bar never sticks short of full.
+        val now = SystemClock.elapsedRealtime()
+        val isFinalUpdate = download.progress >= 100
+        if (!isFinalUpdate && now - lastProgressPostedAt < PROGRESS_THROTTLE_MS) return
+        lastProgressPostedAt = now
+
         with(progressNotificationBuilder) {
             if (!isDownloading) {
                 setSmallIcon(android.R.drawable.stat_sys_download)
@@ -233,5 +248,9 @@ internal class AnimeDownloadNotifier(private val context: Context) {
 
         // Reset download information
         isDownloading = false
+    }
+
+    private companion object {
+        const val PROGRESS_THROTTLE_MS = 500L
     }
 }

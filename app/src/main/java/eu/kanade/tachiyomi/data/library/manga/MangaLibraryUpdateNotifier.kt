@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import coil3.asDrawable
@@ -92,7 +93,14 @@ class MangaLibraryUpdateNotifier(
      * @param current the current progress.
      * @param total the total progress.
      */
+    @Synchronized
     fun showProgressNotification(manga: List<Manga>, current: Int, total: Int) {
+        // Called twice per entry from up to 5 parallel source workers. Coalesce the posts: each
+        // one is a binder call into system_server, and Android sheds anything past ~5 posts/s.
+        val now = SystemClock.elapsedRealtime()
+        if (current < total && now - lastProgressPostedAt < PROGRESS_THROTTLE_MS) return
+        lastProgressPostedAt = now
+
         progressNotificationBuilder
             .setContentTitle(
                 context.stringResource(
@@ -387,7 +395,14 @@ class MangaLibraryUpdateNotifier(
         )
     }
 
+    /**
+     * When the progress notification was last posted, in [SystemClock.elapsedRealtime] millis.
+     */
+    private var lastProgressPostedAt = 0L
+
     companion object {
+        private const val PROGRESS_THROTTLE_MS = 500L
+
         // TODO: Change when implemented on Aniyomi website
         const val HELP_WARNING_URL =
             "https://aniyomi.org/docs/faq/library#why-am-i-warned-about-large-bulk-updates-and-downloads"
