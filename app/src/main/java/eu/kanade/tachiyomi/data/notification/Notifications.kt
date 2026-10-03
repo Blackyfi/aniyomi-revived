@@ -31,6 +31,7 @@ object Notifications {
     const val ID_LIBRARY_SIZE_WARNING = -103
     const val CHANNEL_LIBRARY_ERROR = "library_errors_channel"
     const val ID_LIBRARY_ERROR = -102
+    const val ID_LIBRARY_SKIPPED = -104
 
     /**
      * Notification channel and ids used by the downloader.

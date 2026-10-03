@@ -642,4 +642,7 @@
     <string name="exception_ssl">Secure connection to the source failed. Check the device\'s date and time, or try again later</string>
     <string name="exception_http_too_many_requests">The source is limiting requests (HTTP 429). Wait a bit, then try again</string>
     <string name="exception_http_server_error">The source\'s server had a problem (HTTP %d). Try again later</string>
+    <!-- Library update: entries left out by Smart update -->
+    <string name="notification_update_skipped_text">Left out by your Smart update settings. Tap to see which and why</string>
+    <string name="library_update_skipped_help">These entries were not checked for new chapters or episodes because of your choices under Settings → Library → Global update → Smart update. Each heading is the reason; change those settings to include them.</string>
 </resources>
