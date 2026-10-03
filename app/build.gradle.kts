@@ -42,8 +42,8 @@ android {
     defaultConfig {
         applicationId = "com.blackyfi.aniyomirevived"
 
-        versionCode = 162
-        versionName = "0.18.1.33"
+        versionCode = 163
+        versionName = "0.18.1.34"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
