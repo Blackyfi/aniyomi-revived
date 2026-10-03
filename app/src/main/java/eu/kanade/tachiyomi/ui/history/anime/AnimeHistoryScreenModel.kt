@@ -8,6 +8,7 @@ import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.domain.track.anime.interactor.AddAnimeTracks
 import eu.kanade.presentation.history.anime.AnimeHistoryUiModel
+import eu.kanade.tachiyomi.ui.main.whileMainUiVisible
 import eu.kanade.tachiyomi.util.lang.toLocalDate
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -72,6 +73,7 @@ class AnimeHistoryScreenModel(
         screenModelScope.launch {
             _query.collectLatest { query ->
                 getHistory.subscribe(query ?: "")
+                    .whileMainUiVisible()
                     .distinctUntilChanged()
                     .catch { error ->
                         logcat(LogPriority.ERROR, error)
