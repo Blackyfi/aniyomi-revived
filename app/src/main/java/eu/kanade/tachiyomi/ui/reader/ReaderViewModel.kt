@@ -596,9 +596,10 @@ class ReaderViewModel @JvmOverloads constructor(
         val chapterId = readerChapter.chapter.id!!
         val readAt = Date()
         val sessionReadDuration = chapterReadStartTime?.let { readAt.time - it } ?: 0
+        // Claim the session before suspending, so an overlapping call can't count it again.
+        chapterReadStartTime = null
 
         upsertHistory.await(MangaHistoryUpdate(chapterId, readAt, sessionReadDuration))
-        chapterReadStartTime = null
     }
 
     /**

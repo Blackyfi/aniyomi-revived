@@ -56,10 +56,11 @@ class AddMangaTracks(
                 }
 
                 if (track.startDate <= 0) {
+                    // Reset history keeps its row with a zero date; skip those, or the
+                    // tracker's start date would become 1970-01-01.
                     val firstReadChapterDate = Injekt.get<GetMangaHistory>().await(mangaId)
-                        .sortedBy { it.readAt }
-                        .firstOrNull()
-                        ?.readAt
+                        .mapNotNull { it.readAt?.takeIf { readAt -> readAt.time > 0 } }
+                        .minOrNull()
 
                     firstReadChapterDate?.let {
                         val startDate = firstReadChapterDate.time.convertEpochMillisZone(
