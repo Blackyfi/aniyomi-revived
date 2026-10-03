@@ -241,9 +241,8 @@ open class MangaLibraryScreenModel(
         val filterFnTracking: (MangaLibraryItem) -> Boolean = tracking@{ item ->
             if (isNotLoggedInAnyTrack || trackFiltersIsIgnored) return@tracking true
 
-            val mangaTracks = trackMap
-                .mapValues { entry -> entry.value.map { it.trackerId } }[item.libraryManga.id]
-                .orEmpty()
+            // Look up this entry only; mapping the whole trackMap here made each filter pass O(n²).
+            val mangaTracks = trackMap[item.libraryManga.id].orEmpty().map { it.trackerId }
 
             val isExcluded = excludedTracks.isNotEmpty() && mangaTracks.fastAny { it in excludedTracks }
             val isIncluded = includedTracks.isEmpty() || mangaTracks.fastAny { it in includedTracks }
