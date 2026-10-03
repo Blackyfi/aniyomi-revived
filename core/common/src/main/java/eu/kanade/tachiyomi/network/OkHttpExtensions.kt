@@ -69,7 +69,7 @@ fun Call.asObservableSuccess(): Observable<Response> {
 
 // Based on https://github.com/gildor/kotlin-coroutines-okhttp
 @OptIn(ExperimentalCoroutinesApi::class)
-private suspend fun Call.await(callStack: Array<StackTraceElement>): Response {
+private suspend fun Call.await(callSite: Throwable): Response {
     return suspendCancellableCoroutine { continuation ->
         val callback =
             object : Callback {
@@ -82,7 +82,7 @@ private suspend fun Call.await(callStack: Array<StackTraceElement>): Response {
                 override fun onFailure(call: Call, e: IOException) {
                     // Don't bother with resuming the continuation if it is already cancelled.
                     if (continuation.isCancelled) return
-                    val exception = IOException(e.message, e).apply { stackTrace = callStack }
+                    val exception = IOException(e.message, e).apply { stackTrace = callSite.callerStackTrace() }
                     continuation.resumeWithException(exception)
                 }
             }
@@ -99,20 +99,26 @@ private suspend fun Call.await(callStack: Array<StackTraceElement>): Response {
     }
 }
 
+// Every request records where it was made from so a failure reports the caller rather than
+// OkHttp's dispatcher thread. Creating the Throwable only snapshots the native stack; turning it
+// into StackTraceElements is the costly part, so that is deferred to the failure paths.
+private fun Throwable.callerStackTrace(): Array<StackTraceElement> {
+    return stackTrace.run { copyOfRange(1, size) }
+}
+
 suspend fun Call.await(): Response {
-    val callStack = Exception().stackTrace.run { copyOfRange(1, size) }
-    return await(callStack)
+    return await(Exception())
 }
 
 /**
  * @since extensions-lib 1.5
  */
 suspend fun Call.awaitSuccess(): Response {
-    val callStack = Exception().stackTrace.run { copyOfRange(1, size) }
-    val response = await(callStack)
+    val callSite = Exception()
+    val response = await(callSite)
     if (!response.isSuccessful) {
         response.close()
-        throw HttpException(response.code).apply { stackTrace = callStack }
+        throw HttpException(response.code).apply { stackTrace = callSite.callerStackTrace() }
     }
     return response
 }
