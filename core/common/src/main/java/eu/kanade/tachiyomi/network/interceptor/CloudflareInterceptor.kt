@@ -2,8 +2,9 @@ package eu.kanade.tachiyomi.network.interceptor
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.webkit.WebResourceError
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -30,8 +31,12 @@ class CloudflareInterceptor(
     private val executor = ContextCompat.getMainExecutor(context)
 
     override fun shouldIntercept(response: Response): Boolean {
-        // Check if Cloudflare anti-bot is on
-        return response.code in ERROR_CODES && response.header("Server") in SERVER_CHECK
+        // The cf-mitigated header is Cloudflare's documented signal for a challenge page:
+        // https://developers.cloudflare.com/cloudflare-challenges/challenge-types/challenge-pages/detect-response/
+        // Keying on the status code alone spun up a WebView for every plain 403/503 served by a
+        // Cloudflare-fronted site (rate limits, geo blocks, real errors), none of which it can solve.
+        return response.header("cf-mitigated").isCloudflareChallenge() &&
+            response.header("Server") in SERVER_CHECK
     }
 
     override fun intercept(chain: Interceptor.Chain, request: Request, response: Response): Response {
@@ -71,6 +76,19 @@ class CloudflareInterceptor(
         executor.execute {
             webview = createWebView(originalRequest)
 
+            webview?.addJavascriptInterface(
+                object {
+                    @Suppress("unused")
+                    @JavascriptInterface
+                    fun interactiveDetected() {
+                        // The challenge wants a human (e.g. a Turnstile click) and can't be solved
+                        // here; fail now instead of after the full 30 s timeout.
+                        latch.countDown()
+                    }
+                },
+                JS_INTERFACE_NAME,
+            )
+
             webview?.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
                     fun isCloudFlareBypassed(): Boolean {
@@ -84,15 +102,40 @@ class CloudflareInterceptor(
                         latch.countDown()
                     }
 
-                    if (url == origRequestUrl && !challengeFound) {
-                        // The first request didn't return the challenge, abort.
-                        latch.countDown()
+                    if (url == origRequestUrl) {
+                        if (!challengeFound) {
+                            // The first request didn't return the challenge, abort.
+                            latch.countDown()
+                        } else {
+                            // Listen for the challenge switching to interactive mode.
+                            view.evaluateJavascript(
+                                """
+                                    addEventListener("message", ({data}) => {
+                                        if (data?.source === "cloudflare-challenge" && data?.event === "interactiveBegin") {
+                                            $JS_INTERFACE_NAME.interactiveDetected();
+                                        }
+                                    })
+                                """.trimIndent(),
+                                null,
+                            )
+                        }
                     }
                 }
 
-                override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                    if (request.isForMainFrame) {
-                        if (error.errorCode in ERROR_CODES) {
+                // HTTP statuses arrive here. onReceivedError, used before, only ever gets WebView's
+                // negative ERROR_* network codes, so the challenge was never recognised and the
+                // bypass gave up as soon as the challenge page had loaded.
+                override fun onReceivedHttpError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    errorResponse: WebResourceResponse?,
+                ) {
+                    if (request?.isForMainFrame == true) {
+                        val mitigated = errorResponse?.responseHeaders
+                            ?.entries
+                            ?.firstOrNull { it.key.equals("cf-mitigated", ignoreCase = true) }
+                            ?.value
+                        if (mitigated.isCloudflareChallenge()) {
                             // Found the Cloudflare challenge page.
                             challengeFound = true
                         } else {
@@ -131,7 +174,9 @@ class CloudflareInterceptor(
     }
 }
 
-private val ERROR_CODES = listOf(403, 503)
+private fun String?.isCloudflareChallenge() = this.equals("challenge", ignoreCase = true)
+
+private const val JS_INTERFACE_NAME = "aniyomi"
 private val SERVER_CHECK = arrayOf("cloudflare-nginx", "cloudflare")
 private val COOKIE_NAMES = listOf("cf_clearance")
 
