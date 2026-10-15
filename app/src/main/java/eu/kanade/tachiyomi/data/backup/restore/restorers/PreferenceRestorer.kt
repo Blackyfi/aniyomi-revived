@@ -16,6 +16,7 @@ import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
 import eu.kanade.tachiyomi.data.library.manga.MangaLibraryUpdateJob
 import eu.kanade.tachiyomi.source.sourcePreferences
 import tachiyomi.core.common.preference.AndroidPreferenceStore
+import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.plusAssign
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -48,10 +49,12 @@ class PreferenceRestorer(
     }
 
     suspend fun restoreSource(preferences: List<BackupSourcePreferences>) {
-        preferences.forEach {
-            val sourcePrefs = AndroidPreferenceStore(context, sourcePreferences(it.sourceKey))
-            restorePreferences(it.prefs, sourcePrefs)
-        }
+        preferences
+            .filter { isSourcePreferenceFile(it.sourceKey) }
+            .forEach {
+                val sourcePrefs = AndroidPreferenceStore(context, sourcePreferences(it.sourceKey))
+                restorePreferences(it.prefs, sourcePrefs)
+            }
     }
 
     private suspend fun restorePreferences(
@@ -67,7 +70,7 @@ class PreferenceRestorer(
         val backupCategoriesById = backupCategories?.associateBy { it.id.toString() }.orEmpty()
 
         val prefs = preferenceStore.getAll()
-        toRestore.forEach { (key, value) ->
+        toRestore.filterNot { Preference.isAppState(it.key) }.forEach { (key, value) ->
             try {
                 when (value) {
                     is IntPreferenceValue -> {
@@ -151,5 +154,15 @@ class PreferenceRestorer(
             preferenceStore.getStringSet(key) += ids
         }
         return true
+    }
+
+    companion object {
+        private val SOURCE_PREFERENCE_FILE = Regex("""source_-?\d+""")
+
+        /**
+         * The backup names the shared preferences file to write. Only per-source files may be
+         * restored, so that a crafted backup can't reach the app's own preferences through it.
+         */
+        fun isSourcePreferenceFile(name: String): Boolean = SOURCE_PREFERENCE_FILE.matches(name)
     }
 }
