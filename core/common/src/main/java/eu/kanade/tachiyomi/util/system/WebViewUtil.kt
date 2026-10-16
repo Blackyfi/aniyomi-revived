@@ -83,6 +83,11 @@ fun WebView.setDefaultSettings() {
         loadWithOverviewMode = true
         cacheMode = WebSettings.LOAD_DEFAULT
 
+        // Pages come from the web and from extensions: keep them away from on-device data.
+        // file:///android_asset still loads; it isn't governed by these.
+        allowFileAccess = false
+        allowContentAccess = false
+
         // Allow zooming
         setSupportZoom(true)
         builtInZoomControls = true
