@@ -503,11 +503,11 @@ class AnimeDownloader(
             video.videoUrl = file.uri.path ?: ""
             download.progress = 100
             video.status = Video.State.READY
-            progressJob?.cancel()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             video.status = Video.State.ERROR
             notifier.onError(e.message, download.episode.name, download.anime.title, download.anime.id)
+        } finally {
             progressJob?.cancel()
         }
     }
