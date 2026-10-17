@@ -22,6 +22,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.core.net.toUri
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
+import cafe.adriel.voyager.core.model.screenModelScope
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
@@ -32,6 +33,7 @@ import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import kotlinx.coroutines.flow.update
+import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.LabeledCheckbox
 import tachiyomi.presentation.core.components.LazyColumnWithAction
@@ -170,7 +172,8 @@ private class RestoreBackupScreenModel(
 ) : StateScreenModel<RestoreBackupScreenModel.State>(State()) {
 
     init {
-        validate(uri.toUri())
+        // Validating decodes the whole backup, which takes seconds for a large library.
+        screenModelScope.launchIO { validate(uri.toUri()) }
     }
 
     fun toggle(setter: (RestoreOptions, Boolean) -> RestoreOptions, enabled: Boolean) {
@@ -194,7 +197,7 @@ private class RestoreBackupScreenModel(
             BackupFileValidator(context).validate(uri)
         } catch (e: Exception) {
             setError(
-                error = InvalidRestore(uri, e.message.toString()),
+                error = InvalidRestore(uri, (e.cause ?: e).message.toString()),
                 canRestore = false,
             )
             return
