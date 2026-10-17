@@ -65,6 +65,7 @@ class AnimeDownloadManager(
     // For use by DownloadService only
     fun downloaderStart() = downloader.start()
     fun downloaderStop(reason: String? = null) = downloader.stop(reason)
+    suspend fun awaitQueueRestored() = downloader.awaitQueueRestored()
 
     val isDownloaderRunning
         get() = AnimeDownloadJob.isRunningFlow(context)
