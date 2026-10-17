@@ -168,7 +168,8 @@ abstract class AnimeSearchScreenModel(
                         if (isActive) {
                             updateItem(source, AnimeSearchItemResult.Success(titles))
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
+                        // Throwable: an extension built against other APIs fails with a LinkageError.
                         if (isActive) {
                             ExtensionErrorStorage.record(source.id, source.name, "Search", e, detail = query)
                             updateItem(source, AnimeSearchItemResult.Error(e))
