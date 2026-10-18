@@ -23,6 +23,7 @@ import coil3.asDrawable
 import coil3.dispose
 import coil3.imageLoader
 import coil3.request.CachePolicy
+import coil3.request.Disposable
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Precision
@@ -67,6 +68,13 @@ open class ReaderPageImageView @JvmOverloads constructor(
     private var pageView: View? = null
 
     private var config: Config? = null
+
+    /**
+     * In-flight Coil decode. Its target is a lambda, so Coil can't tie it to the view by itself: left
+     * running, a recycled webtoon holder would burn CPU and memory on a page that has scrolled away
+     * and could then paint it over the page it was rebound to.
+     */
+    private var imageRequest: Disposable? = null
 
     var onImageLoaded: (() -> Unit)? = null
     var onImageLoadError: (() -> Unit)? = null
@@ -183,6 +191,8 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     fun recycle() = pageView?.let {
+        imageRequest?.dispose()
+        imageRequest = null
         when (it) {
             is SubsamplingScaleImageView -> it.recycle()
             is AppCompatImageView -> it.dispose()
@@ -321,7 +331,8 @@ open class ReaderPageImageView @JvmOverloads constructor(
                     return@apply
                 }
 
-                ImageRequest.Builder(context)
+                imageRequest?.dispose()
+                imageRequest = ImageRequest.Builder(context)
                     .data(data)
                     .memoryCachePolicy(CachePolicy.DISABLED)
                     .diskCachePolicy(CachePolicy.DISABLED)
@@ -414,7 +425,8 @@ open class ReaderPageImageView @JvmOverloads constructor(
             )
             .crossfade(false)
             .build()
-        context.imageLoader.enqueue(request)
+        imageRequest?.dispose()
+        imageRequest = context.imageLoader.enqueue(request)
     }
 
     private fun Int.getSystemScaledDuration(): Int {
