@@ -12,4 +12,4 @@ data class TorrentInfo(
     }
 }
 
-class DeadTorrentException : Exception()
+class DeadTorrentException : Exception("Dead torrent: no response from the torrent server or its peers")
