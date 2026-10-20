@@ -76,6 +76,12 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         get() = getPropertyBoolean("pause")
         set(paused) = MPVLib.setPropertyBoolean("pause", paused!!)
 
+    val isSeeking: Boolean?
+        get() = getPropertyBoolean("seeking")
+
+    val isPausedForCache: Boolean?
+        get() = getPropertyBoolean("paused-for-cache")
+
     val hwdecActive: String
         get() = getPropertyString("hwdec-current") ?: "no"
 
