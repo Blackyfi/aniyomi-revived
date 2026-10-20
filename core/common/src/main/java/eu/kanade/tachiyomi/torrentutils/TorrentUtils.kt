@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
 import eu.kanade.tachiyomi.torrentServer.TorrentServerStarter
+import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
 import eu.kanade.tachiyomi.torrentServer.model.Torrent
 import eu.kanade.tachiyomi.torrentutils.model.DeadTorrentException
 import eu.kanade.tachiyomi.torrentutils.model.TorrentFile
@@ -12,9 +13,11 @@ import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
+import java.io.File
 import java.io.IOException
 import java.net.InetAddress
 import java.net.SocketTimeoutException
+import java.net.URLEncoder
 
 object TorrentUtils {
     private val torrentServerStarter: TorrentServerStarter by injectLazy()
@@ -65,6 +68,29 @@ object TorrentUtils {
             throw e
         }
     }
+
+    /**
+     * Local URL that serves the raw bytes of [file] from the torrent server, for sources that show
+     * a torrent's files directly (e.g. images in a reader) rather than through the player.
+     *
+     * The link carries the torrent's magnet (hash + trackers), so if the server was restarted
+     * since [getTorrentInfo] loaded the torrent, the first request re-adds it. Call
+     * [keepServerAlive] before each request so the server is up.
+     */
+    fun getStreamUrl(file: TorrentFile): String {
+        val magnet = file.toMagnetURI().substringBefore("&index=")
+        val name = URLEncoder.encode(File(file.path).name, "UTF-8")
+        return "${TorrentServerUtils.hostUrl}/stream/$name" +
+            "?link=${URLEncoder.encode(magnet, "UTF-8")}&index=${file.indexFile}&play"
+    }
+
+    /**
+     * Starts the torrent server if needed and postpones its idle stop. Blocking (waits for the
+     * server to answer); call it off the main thread, e.g. from an interceptor.
+     *
+     * @return true if the server is reachable.
+     */
+    fun keepServerAlive(): Boolean = torrentServerStarter.ensureRunning()
 
     /**
      * Magnets go to the server as-is. A .torrent link is downloaded here, through the app's own
