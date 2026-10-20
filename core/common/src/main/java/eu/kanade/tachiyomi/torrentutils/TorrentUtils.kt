@@ -1,7 +1,10 @@
 package eu.kanade.tachiyomi.torrentutils
 
+import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
 import eu.kanade.tachiyomi.torrentServer.TorrentServerStarter
+import eu.kanade.tachiyomi.torrentServer.model.Torrent
 import eu.kanade.tachiyomi.torrentutils.model.DeadTorrentException
 import eu.kanade.tachiyomi.torrentutils.model.TorrentFile
 import eu.kanade.tachiyomi.torrentutils.model.TorrentInfo
@@ -9,18 +12,20 @@ import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
+import java.io.IOException
 import java.net.InetAddress
 import java.net.SocketTimeoutException
 
 object TorrentUtils {
     private val torrentServerStarter: TorrentServerStarter by injectLazy()
+    private val network: NetworkHelper by injectLazy()
 
     fun getTorrentInfo(
         url: String,
         title: String,
     ): TorrentInfo {
-        // Untrusted extensions supply [url]; the local server will fetch it. Restrict to torrent
-        // schemes and refuse links pointing at loopback/private hosts (SSRF guard).
+        // Untrusted extensions supply [url]. Restrict to torrent schemes and refuse links pointing
+        // at loopback/private hosts (SSRF guard).
         requireSafeTorrentLink(url)
         // Extensions call this while building the episode list (well before the player opens), but
         // the server is otherwise only started on playback. Bring it up here so adding the torrent
@@ -31,7 +36,7 @@ object TorrentUtils {
         }
         logcat(LogPriority.INFO) { "[Torrent] getTorrentInfo title='$title'" }
         try {
-            val torrent = TorrentServerApi.addTorrent(url, title, "", "", false)
+            val torrent = addToServer(url.trim(), title)
             val trackers = torrent.trackers ?: emptyList()
             return TorrentInfo(
                 title = torrent.title ?: title,
@@ -58,6 +63,40 @@ object TorrentUtils {
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "[Torrent] getTorrentInfo failed" }
             throw e
+        }
+    }
+
+    /**
+     * Magnets go to the server as-is. A .torrent link is downloaded here, through the app's own
+     * client, and its bytes uploaded: the native server resolves hosts with the system DNS, which
+     * ISP blocklists answer with a sinkhole, while the app (and the extension that found the link)
+     * may be using DNS-over-HTTPS. It also turns a dead link into a readable error instead of the
+     * server's empty 400.
+     */
+    private fun addToServer(link: String, title: String): Torrent {
+        if (link.startsWith("magnet:", ignoreCase = true)) {
+            return TorrentServerApi.addTorrent(link, title, "", "", false)
+        }
+        network.client.newCall(GET(link)).execute().use { response ->
+            // OkHttp can't follow a redirect to a magnet: link and hands back the 3xx instead.
+            val location = response.header("Location")
+            if (response.isRedirect && location != null && location.startsWith("magnet:", ignoreCase = true)) {
+                return TorrentServerApi.addTorrent(location, title, "", "", false)
+            }
+            if (!response.isSuccessful) {
+                throw IOException("Couldn't download the torrent file (HTTP ${response.code})")
+            }
+            val source = response.body.source()
+            source.request(MAX_TORRENT_FILE_BYTES + 1)
+            if (source.buffer.size > MAX_TORRENT_FILE_BYTES) {
+                throw IOException("The torrent file is too large")
+            }
+            val bytes = source.buffer.readByteArray()
+            // A bencoded torrent is a dictionary; anything else is an error or login page.
+            if (bytes.isEmpty() || bytes[0] != 'd'.code.toByte()) {
+                throw IOException("The link didn't return a torrent file")
+            }
+            return TorrentServerApi.uploadTorrent(bytes, title)
         }
     }
 
@@ -95,15 +134,10 @@ object TorrentUtils {
             }
         }
 
-        // Hostname: resolve it ourselves and refuse if any answer is private, so a public name
-        // pointed at 127.0.0.1/192.168.x (DNS rebinding) can't reach the local network through
-        // the torrent server. If resolution fails, let it through — the server will fail the
-        // same lookup anyway and this keeps flaky DNS from mislabeling links as "non-public".
-        return try {
-            InetAddress.getAllByName(h).any(::isPrivateAddress)
-        } catch (e: Exception) {
-            false
-        }
+        // Hostnames aren't resolved here: the app's client fetches .torrent links itself (the
+        // server never sees them), so a lookup would add nothing over any extension request, and
+        // ISP DNS blocks answer with ::1, which made this refuse perfectly public torrent hosts.
+        return false
     }
 
     private fun isPrivateAddress(addr: InetAddress): Boolean {
@@ -120,4 +154,7 @@ object TorrentUtils {
     }
 
     private val IPV4_LITERAL = Regex("""\d{1,3}(\.\d{1,3}){3}""")
+
+    // Real .torrent files are a few MB at most even for huge multi-file packs.
+    private const val MAX_TORRENT_FILE_BYTES = 32L * 1024 * 1024
 }

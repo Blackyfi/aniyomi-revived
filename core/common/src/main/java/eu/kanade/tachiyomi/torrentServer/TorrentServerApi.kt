@@ -11,9 +11,12 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
+import java.io.IOException
 
 object TorrentServerApi {
     private val network: NetworkHelper by injectLazy()
@@ -21,6 +24,7 @@ object TorrentServerApi {
 
     private val hostUrl get() = TorrentServerUtils.hostUrl
     private val jsonMediaType = "application/json".toMediaTypeOrNull()
+    private val torrentMediaType = "application/x-bittorrent".toMediaTypeOrNull()
 
     @Suppress("TooGenericExceptionCaught")
     fun echo(): String {
@@ -63,15 +67,35 @@ object TorrentServerApi {
         val resp = network.client.newCall(
             POST("$hostUrl/torrents", body = req.toRequestBody(jsonMediaType)),
         ).execute()
+        return resp.decodeTorrent("addTorrent")
+    }
+
+    /**
+     * Adds a torrent from the raw bytes of a .torrent file (fetched by the app rather than by the
+     * server, so it goes through the app's network stack: DNS-over-HTTPS, cookies, user agent).
+     */
+    fun uploadTorrent(file: ByteArray, title: String): Torrent {
+        logcat(LogPriority.INFO) { "[Torrent] uploadTorrent title='$title' bytes=${file.size}" }
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("title", title)
+            .addFormDataPart("file", "file.torrent", file.toRequestBody(torrentMediaType))
+            .build()
+        val resp = network.client.newCall(POST("$hostUrl/torrent/upload", body = body)).execute()
+        return resp.decodeTorrent("uploadTorrent")
+    }
+
+    private fun Response.decodeTorrent(action: String): Torrent = use { resp ->
         val bodyStr = resp.body.string()
         if (!resp.isSuccessful) {
-            logcat(LogPriority.ERROR) {
-                "[Torrent] addTorrent failed HTTP ${resp.code} from $hostUrl/torrents body=$bodyStr"
-            }
+            logcat(LogPriority.ERROR) { "[Torrent] $action failed HTTP ${resp.code} body=$bodyStr" }
+            // The server answers a link it can't load with an empty 400; decoding that would only
+            // surface as an opaque JSON error.
+            throw IOException("The torrent server couldn't load this torrent (HTTP ${resp.code})")
         }
-        return json.decodeFromString(Torrent.serializer(), bodyStr).also {
+        json.decodeFromString(Torrent.serializer(), bodyStr).also {
             logcat(LogPriority.INFO) {
-                "[Torrent] addTorrent ok hash=${it.hash} files=${it.file_stats?.size ?: 0} size=${it.torrent_size}"
+                "[Torrent] $action ok hash=${it.hash} files=${it.file_stats?.size ?: 0} size=${it.torrent_size}"
             }
         }
     }
