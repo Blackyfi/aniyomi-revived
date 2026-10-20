@@ -321,7 +321,8 @@ class PagerPageHolder(
 
         val imageUrl = page.imageUrl
         errorLayout?.actionOpenInWebView?.isVisible =
-            imageUrl != null && TorrentServerUtils.streamHash(imageUrl) == null
+            imageUrl != null &&
+            TorrentServerUtils.streamHash(imageUrl) == null
         if (imageUrl != null) {
             if (imageUrl.startsWith("http", true)) {
                 errorLayout?.actionOpenInWebView?.viewer = viewer
