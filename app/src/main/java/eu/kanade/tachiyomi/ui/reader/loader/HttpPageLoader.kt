@@ -6,18 +6,22 @@ import aniyomi.util.DataSaver.Companion.getImage
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.database.models.manga.toDomainChapter
+import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
 import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
 import eu.kanade.tachiyomi.torrentServer.model.TorrentLoadStatus
 import eu.kanade.tachiyomi.torrentServer.model.toLoadStatus
+import eu.kanade.tachiyomi.torrentutils.TorrentUtils
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -68,6 +72,11 @@ internal class HttpPageLoader(
     private var torrentDeadUntilMs = 0L
 
     private val torrentDownloads = Semaphore(MAX_TORRENT_DOWNLOADS)
+
+    private var torrentKeepAliveJob: Job? = null
+
+    @Volatile
+    private var lastPageRequestMs = SystemClock.elapsedRealtime()
 
     init {
         scope.launchIO {
@@ -135,6 +144,7 @@ internal class HttpPageLoader(
      * Loads a page through the queue. Handles re-enqueueing pages if they were evicted from the cache.
      */
     override suspend fun loadPage(page: ReaderPage) = withIOContext {
+        lastPageRequestMs = SystemClock.elapsedRealtime()
         val imageUrl = page.imageUrl
 
         // Check if the image has been deleted
@@ -246,6 +256,7 @@ internal class HttpPageLoader(
             throw IOException("The torrent has no peers")
         }
 
+        keepTorrentAlive(imageUrl)
         val policy = TorrentRetryPolicy(SystemClock.elapsedRealtime())
         val statusJob = launch { publishTorrentStatus(page, hash, policy) }
         try {
@@ -270,6 +281,30 @@ internal class HttpPageLoader(
             throw e
         } finally {
             statusJob.cancel()
+        }
+    }
+
+    /**
+     * The server drops a torrent, and its peers, seconds after the last read. Anyone taking longer
+     * than that over the pages already fetched would wait for peers all over again on the next batch,
+     * so this keeps the torrent loaded while the chapter is being read, and no longer: it ends soon
+     * after page changes stop, e.g. when the reader is left in the background.
+     */
+    private fun keepTorrentAlive(imageUrl: String) = synchronized(this) {
+        if (torrentKeepAliveJob?.isActive == true) return
+        torrentKeepAliveJob = scope.launchIO {
+            while (SystemClock.elapsedRealtime() - lastPageRequestMs < TORRENT_KEEP_ALIVE_MAX_IDLE_MS) {
+                delay(TORRENT_KEEP_ALIVE_INTERVAL_MS)
+                runCatching {
+                    runInterruptible {
+                        if (TorrentUtils.keepServerAlive()) {
+                            // With &stat the server answers with the status instead of the file, and
+                            // pushes the torrent's expiry back the same way a playback request does.
+                            Injekt.get<NetworkHelper>().client.newCall(GET("$imageUrl&stat")).execute().close()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -329,6 +364,8 @@ internal class HttpPageLoader(
 }
 
 private const val MAX_TORRENT_DOWNLOADS = 3
+private const val TORRENT_KEEP_ALIVE_INTERVAL_MS = 60_000L
+private const val TORRENT_KEEP_ALIVE_MAX_IDLE_MS = 10 * 60_000L
 
 /** Delay before the first status, so that a page the server already has doesn't flash one. */
 private const val TORRENT_STATUS_FIRST_DELAY_MS = 1_000L
