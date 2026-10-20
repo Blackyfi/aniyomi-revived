@@ -145,7 +145,7 @@ class SettingsSearchScreen(
                                 IconButton(onClick = { textFieldState.clearText() }) {
                                     Icon(
                                         imageVector = Icons.Outlined.Close,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(MR.strings.action_clear),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }

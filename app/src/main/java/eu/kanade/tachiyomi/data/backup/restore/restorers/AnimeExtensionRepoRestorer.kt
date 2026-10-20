@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.data.backup.restore.restorers
 
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionRepos
+import eu.kanade.tachiyomi.data.backup.models.isValid
 import mihon.domain.extensionrepo.anime.interactor.GetAnimeExtensionRepo
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import uy.kohesive.injekt.Injekt
@@ -14,6 +15,9 @@ class AnimeExtensionRepoRestorer(
     suspend operator fun invoke(
         backupRepo: BackupExtensionRepos,
     ) {
+        // A repo's fingerprint decides which extensions get to load, and its URL where they come from.
+        require(backupRepo.isValid()) { "Invalid extension repo: ${backupRepo.name}" }
+
         val dbRepos = getExtensionRepos.getAll()
         val existingReposBySHA = dbRepos.associateBy { it.signingKeyFingerprint }
         val existingReposByUrl = dbRepos.associateBy { it.baseUrl }

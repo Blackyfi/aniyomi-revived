@@ -70,6 +70,7 @@ import kotlinx.coroutines.delay
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.preference.toggle
+import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.Slider
 import tachiyomi.presentation.core.components.material.padding
@@ -530,7 +531,12 @@ fun OutlinedNumericChooser(
     Row(verticalAlignment = Alignment.CenterVertically) {
         RepeatingIconButton(
             onClick = { updateValue(false) },
-        ) { Icon(imageVector = Icons.Outlined.RemoveCircle, contentDescription = null) }
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.RemoveCircle,
+                contentDescription = stringResource(MR.strings.action_remove),
+            )
+        }
 
         OutlinedTextField(
             value = "%d".format(currentValue),
@@ -553,7 +559,7 @@ fun OutlinedNumericChooser(
 
         RepeatingIconButton(
             onClick = { updateValue(true) },
-        ) { Icon(imageVector = Icons.Outlined.AddCircle, contentDescription = null) }
+        ) { Icon(imageVector = Icons.Outlined.AddCircle, contentDescription = stringResource(MR.strings.action_add)) }
     }
 }
 

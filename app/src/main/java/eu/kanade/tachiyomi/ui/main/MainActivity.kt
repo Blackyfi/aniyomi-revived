@@ -515,9 +515,7 @@ class MainActivity : BaseActivity() {
                 if (!query.isNullOrEmpty()) {
                     navigator.popUntilRoot()
 
-                    val screenType = intent.getStringExtra(INTENT_SEARCH_TYPE).orEmpty()
-                        .ifBlank { "ANIME" }
-                        .let(DeepLinkScreenType::valueOf)
+                    val screenType = DeepLinkScreenType.fromExtra(intent.getStringExtra(INTENT_SEARCH_TYPE))
 
                     when (screenType) {
                         DeepLinkScreenType.MANGA -> {
@@ -552,7 +550,7 @@ class MainActivity : BaseActivity() {
             }
             Intent.ACTION_VIEW -> {
                 // Handling opening of backup files
-                if (intent.data.toString().endsWith(".tachibk")) {
+                if (intent.scheme in BACKUP_FILE_SCHEMES && intent.data.toString().endsWith(".tachibk")) {
                     navigator.popUntilRoot()
                     navigator.push(RestoreBackupScreen(intent.data.toString()))
                 }
@@ -599,6 +597,8 @@ class MainActivity : BaseActivity() {
         const val INTENT_SEARCH_QUERY = "query"
         const val INTENT_SEARCH_FILTER = "filter"
         const val INTENT_SEARCH_TYPE = "type"
+
+        private val BACKUP_FILE_SCHEMES = setOf("content", "file")
 
         const val SAVED_STATE_ANIME_KEY = "saved_state_anime_key"
         const val SAVED_STATE_EPISODE_KEY = "saved_state_episode_key"

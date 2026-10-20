@@ -111,7 +111,7 @@ fun AnimeTrackerSearch(
                         IconButton(onClick = onDismissRequest) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = null,
+                                contentDescription = stringResource(MR.strings.action_bar_up_description),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

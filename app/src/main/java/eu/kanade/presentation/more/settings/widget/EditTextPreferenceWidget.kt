@@ -75,7 +75,10 @@ fun EditTextPreferenceWidget(
                             Icon(imageVector = Icons.Filled.Error, contentDescription = null)
                         } else {
                             IconButton(onClick = { textFieldValue = TextFieldValue("") }) {
-                                Icon(imageVector = Icons.Filled.Cancel, contentDescription = null)
+                                Icon(
+                                    imageVector = Icons.Filled.Cancel,
+                                    contentDescription = stringResource(MR.strings.action_clear),
+                                )
                             }
                         }
                     },
