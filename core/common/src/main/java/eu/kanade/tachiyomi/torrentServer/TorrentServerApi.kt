@@ -17,12 +17,19 @@ import okhttp3.Response
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 object TorrentServerApi {
     private val network: NetworkHelper by injectLazy()
     private val json: Json by injectLazy()
 
     private val hostUrl get() = TorrentServerUtils.hostUrl
+
+    // Adding a magnet only answers once peers have delivered its metadata, which can take a while on
+    // a healthy torrent too. Giving up sooner would call it dead when it's merely slow.
+    private val addClient by lazy {
+        network.client.newBuilder().readTimeout(ADD_TORRENT_TIMEOUT_SECONDS, TimeUnit.SECONDS).build()
+    }
     private val jsonMediaType = "application/json".toMediaTypeOrNull()
     private val torrentMediaType = "application/x-bittorrent".toMediaTypeOrNull()
 
@@ -64,7 +71,7 @@ object TorrentServerApi {
             data = data,
             saveToDb = save,
         ).toString()
-        val resp = network.client.newCall(
+        val resp = addClient.newCall(
             POST("$hostUrl/torrents", body = req.toRequestBody(jsonMediaType)),
         ).execute()
         return resp.decodeTorrent("addTorrent")
@@ -137,3 +144,5 @@ object TorrentServerApi {
     }
     // endregion
 }
+
+private const val ADD_TORRENT_TIMEOUT_SECONDS = 60L
