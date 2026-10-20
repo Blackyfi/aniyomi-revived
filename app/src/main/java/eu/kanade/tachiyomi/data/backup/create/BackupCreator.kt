@@ -217,7 +217,7 @@ class BackupCreator(
         return preferenceBackupCreator.createSource(includePrivatePreferences = options.privateSettings)
     }
 
-    private fun backupExtensions(options: BackupOptions): List<BackupExtension> {
+    private suspend fun backupExtensions(options: BackupOptions): List<BackupExtension> {
         if (!options.extensions) return emptyList()
 
         return extensionsBackupCreator()

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
+import kotlinx.coroutines.flow.first
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
@@ -15,7 +16,11 @@ class ExtensionsBackupCreator(
     private val mangaExtensionManager: MangaExtensionManager = Injekt.get(),
 ) {
 
-    operator fun invoke(): List<BackupExtension> {
+    suspend operator fun invoke(): List<BackupExtension> {
+        // A backup can run in a freshly started process, before the extensions have been scanned.
+        animeExtensionManager.isInitialized.first { it }
+        mangaExtensionManager.isInitialized.first { it }
+
         val installedExtensions = mutableListOf<BackupExtension>()
         animeExtensionManager.installedExtensionsFlow.value.forEach {
             val packageName = it.pkgName
