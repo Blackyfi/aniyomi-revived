@@ -22,6 +22,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
@@ -61,49 +63,60 @@ class TorrentServerService : Service() {
         return START_NOT_STICKY
     }
 
-    @Suppress("MagicNumber")
     private fun startServer() {
         serviceScope.launch {
-            try {
-                if (TorrentServerApi.echo() == "") {
-                    val port = preferences.port().get().toString()
-                    logcat(LogPriority.INFO) {
-                        "[Torrent] starting native server on port $port, data dir=${applicationContext.filesDir.absolutePath}"
-                    }
-                    torrServer.TorrServer.startTorrentServerOnPort(applicationContext.filesDir.absolutePath, port)
-                    if (wait(10)) {
-                        TorrentServerUtils.setTrackersList()
-                        TorrentServerUtils.applyServerSettings()
-                        isRunning = true
-                        logcat(LogPriority.INFO) { "[Torrent] native server is up (${TorrentServerUtils.hostUrl})" }
-                    } else {
-                        logcat(LogPriority.ERROR) { "[Torrent] native server did not respond within 10s" }
-                    }
-                } else {
-                    isRunning = true
-                    logcat(LogPriority.INFO) {
-                        "[Torrent] native server already running (${TorrentServerUtils.hostUrl})"
-                    }
-                }
-            } catch (e: Exception) {
-                logcat(LogPriority.ERROR, e) { "[Torrent] unable to start torrent server" }
+            // The native start exits the whole process if the port is already bound, so two starts
+            // racing past the echo check (reader pages, an extension and the player can all ask at
+            // once) would kill the app. Serialized, the second one sees the first's server answer.
+            lifecycleMutex.withLock {
+                startServerLocked()
             }
+        }
+    }
+
+    @Suppress("MagicNumber")
+    private fun startServerLocked() {
+        try {
+            if (TorrentServerApi.echo() == "") {
+                val port = preferences.port().get().toString()
+                logcat(LogPriority.INFO) {
+                    "[Torrent] starting native server on port $port, data dir=${applicationContext.filesDir.absolutePath}"
+                }
+                torrServer.TorrServer.startTorrentServerOnPort(applicationContext.filesDir.absolutePath, port)
+                if (wait(10)) {
+                    TorrentServerUtils.setTrackersList()
+                    TorrentServerUtils.applyServerSettings()
+                    isRunning = true
+                    logcat(LogPriority.INFO) { "[Torrent] native server is up (${TorrentServerUtils.hostUrl})" }
+                } else {
+                    logcat(LogPriority.ERROR) { "[Torrent] native server did not respond within 10s" }
+                }
+            } else {
+                isRunning = true
+                logcat(LogPriority.INFO) {
+                    "[Torrent] native server already running (${TorrentServerUtils.hostUrl})"
+                }
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e) { "[Torrent] unable to start torrent server" }
         }
     }
 
     private fun stopServer() {
         serviceScope.launch {
-            try {
-                logcat(LogPriority.INFO) { "[Torrent] stopping native server" }
-                torrServer.TorrServer.stopTorrentServer()
-                TorrentServerApi.shutdown()
-            } catch (e: Exception) {
-                logcat(LogPriority.ERROR, e) { "[Torrent] unable to stop torrent server" }
-            } finally {
-                isRunning = false
-                applicationContext.cancelNotification(Notifications.ID_TORRENT_SERVER)
-                stopSelf()
-                logcat(LogPriority.INFO) { "[Torrent] server service stopped" }
+            lifecycleMutex.withLock {
+                try {
+                    logcat(LogPriority.INFO) { "[Torrent] stopping native server" }
+                    torrServer.TorrServer.stopTorrentServer()
+                    TorrentServerApi.shutdown()
+                } catch (e: Exception) {
+                    logcat(LogPriority.ERROR, e) { "[Torrent] unable to stop torrent server" }
+                } finally {
+                    isRunning = false
+                    applicationContext.cancelNotification(Notifications.ID_TORRENT_SERVER)
+                    stopSelf()
+                    logcat(LogPriority.INFO) { "[Torrent] server service stopped" }
+                }
             }
         }
     }
@@ -168,6 +181,11 @@ class TorrentServerService : Service() {
         private const val IDLE_STOP_DELAY_MS = 5 * 60 * 1000L
         private val IDLE_STOP_TOKEN = Any()
         private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+        private val lifecycleMutex = Mutex()
+
+        // A failed connection to loopback returns at once, so a short poll costs nothing and takes
+        // up to most of a second off every cold start of the server.
+        private const val WAIT_POLL_MS = 200L
 
         /**
          * (Re)arms a delayed stop of the server, unless a player attaches before it fires.
@@ -222,13 +240,12 @@ class TorrentServerService : Service() {
          */
         @Suppress("MagicNumber")
         fun wait(timeout: Int = -1): Boolean {
-            var count = 0
+            val deadline = SystemClock.elapsedRealtime() + timeout * 1000L
             while (TorrentServerApi.echo() == "") {
-                if (timeout in 0..count) {
+                if (timeout >= 0 && SystemClock.elapsedRealtime() >= deadline) {
                     return false
                 }
-                Thread.sleep(1000)
-                count++
+                Thread.sleep(WAIT_POLL_MS)
             }
             return true
         }
