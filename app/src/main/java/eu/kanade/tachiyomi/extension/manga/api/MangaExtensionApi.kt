@@ -4,7 +4,6 @@ import android.content.Context
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
-import eu.kanade.tachiyomi.extension.manga.model.MangaLoadResult
 import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionLoader
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
@@ -12,6 +11,7 @@ import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.parseAs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
@@ -70,8 +70,8 @@ internal class MangaExtensionApi {
         context: Context,
         fromAvailableExtensionList: Boolean = false,
     ): List<MangaExtension.Installed>? {
-        // Limit checks to once a day at most
-        if (fromAvailableExtensionList &&
+        // Limit network checks to once a day at most. The available list costs nothing to look through.
+        if (!fromAvailableExtensionList &&
             Instant.now().toEpochMilli() < lastExtCheck.get() + 1.days.inWholeMilliseconds
         ) {
             return null
@@ -83,12 +83,14 @@ internal class MangaExtensionApi {
         val extensions = if (fromAvailableExtensionList) {
             extensionManager.availableExtensionsFlow.value
         } else {
-            findExtensions().also { lastExtCheck.set(Instant.now().toEpochMilli()) }
+            // An empty result means every repo failed or none is set up, so leave the next launch free to retry.
+            findExtensions().also {
+                if (it.isNotEmpty()) lastExtCheck.set(Instant.now().toEpochMilli())
+            }
         }
 
-        val installedExtensions = MangaExtensionLoader.loadMangaExtensions(context)
-            .filterIsInstance<MangaLoadResult.Success>()
-            .map { it.extension }
+        extensionManager.isInitialized.first { it }
+        val installedExtensions = extensionManager.installedExtensionsFlow.value
 
         val extensionsWithUpdate = mutableListOf<MangaExtension.Installed>()
         for (installedExt in installedExtensions) {

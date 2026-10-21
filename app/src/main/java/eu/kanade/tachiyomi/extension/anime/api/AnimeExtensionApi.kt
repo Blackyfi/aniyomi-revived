@@ -4,7 +4,6 @@ import android.content.Context
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
-import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
 import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionLoader
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
@@ -12,6 +11,7 @@ import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.parseAs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
@@ -36,7 +36,7 @@ internal class AnimeExtensionApi {
     private val json: Json by injectLazy()
 
     private val lastExtCheck: Preference<Long> by lazy {
-        preferenceStore.getLong("last_ext_check", 0)
+        preferenceStore.getLong("last_anime_ext_check", 0)
     }
 
     suspend fun findExtensions(): List<AnimeExtension.Available> {
@@ -70,8 +70,8 @@ internal class AnimeExtensionApi {
         context: Context,
         fromAvailableExtensionList: Boolean = false,
     ): List<AnimeExtension.Installed>? {
-        // Limit checks to once a day at most
-        if (fromAvailableExtensionList &&
+        // Limit network checks to once a day at most. The available list costs nothing to look through.
+        if (!fromAvailableExtensionList &&
             Instant.now().toEpochMilli() < lastExtCheck.get() + 1.days.inWholeMilliseconds
         ) {
             return null
@@ -83,12 +83,14 @@ internal class AnimeExtensionApi {
         val extensions = if (fromAvailableExtensionList) {
             animeExtensionManager.availableExtensionsFlow.value
         } else {
-            findExtensions().also { lastExtCheck.set(Instant.now().toEpochMilli()) }
+            // An empty result means every repo failed or none is set up, so leave the next launch free to retry.
+            findExtensions().also {
+                if (it.isNotEmpty()) lastExtCheck.set(Instant.now().toEpochMilli())
+            }
         }
 
-        val installedExtensions = AnimeExtensionLoader.loadExtensions(context)
-            .filterIsInstance<AnimeLoadResult.Success>()
-            .map { it.extension }
+        animeExtensionManager.isInitialized.first { it }
+        val installedExtensions = animeExtensionManager.installedExtensionsFlow.value
 
         val extensionsWithUpdate = mutableListOf<AnimeExtension.Installed>()
         for (installedExt in installedExtensions) {
