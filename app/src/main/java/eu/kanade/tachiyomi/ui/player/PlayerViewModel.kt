@@ -69,6 +69,8 @@ import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
 import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
+import eu.kanade.tachiyomi.torrentServer.model.TorrentLoadStatus
+import eu.kanade.tachiyomi.torrentServer.model.toLoadStatus
 import eu.kanade.tachiyomi.ui.player.controls.components.IndexedSegment
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.getChangedAt
@@ -99,9 +101,14 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -137,6 +144,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
 import java.io.InputStream
+import java.net.SocketTimeoutException
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
@@ -249,6 +257,13 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _readAhead = MutableStateFlow(0f)
     val readAhead = _readAhead.asStateFlow()
 
+    private val cacheSpeed = MutableStateFlow(0L)
+    private val bufferingPercent = MutableStateFlow(0)
+
+    /** Hash of the torrent being played, if any. */
+    private val torrentHash = MutableStateFlow<String?>(null)
+    private val torrentStatus = MutableStateFlow<TorrentLoadStatus?>(null)
+
     private val _paused = MutableStateFlow(false)
     val paused = _paused.asStateFlow()
 
@@ -308,7 +323,39 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _primaryButton = MutableStateFlow<CustomButton?>(null)
     val primaryButton = _primaryButton.asStateFlow()
 
+    /**
+     * What to tell the user while the loading indicator is up, null the rest of the time so that the
+     * cache figures changing during playback don't recompose anything.
+     */
+    val loadingStatus = combine(
+        combine(isLoading, isLoadingEpisode) { loading, loadingEpisode -> loading || loadingEpisode },
+        cacheSpeed,
+        bufferingPercent,
+        torrentStatus,
+    ) { loading, speed, percent, torrent ->
+        if (loading) PlayerLoadingStatus(speed, percent, torrent) else null
+    }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
+
     init {
+        viewModelScope.launch {
+            combine(isLoading, isLoadingEpisode, torrentHash) { loading, loadingEpisode, hash ->
+                hash.takeIf { loading || loadingEpisode }
+            }
+                .distinctUntilChanged()
+                .collectLatest { hash ->
+                    torrentStatus.value = hash?.let { TorrentLoadStatus() }
+                    if (hash == null) return@collectLatest
+                    while (true) {
+                        // Fails while the server is starting or hasn't been handed the torrent yet.
+                        runCatching { withIOContext { TorrentServerApi.getTorrent(hash) } }
+                            .getOrNull()
+                            ?.let { torrentStatus.value = it.toLoadStatus() }
+                        delay(TORRENT_STATUS_INTERVAL_MS)
+                    }
+                }
+        }
         viewModelScope.launchIO {
             try {
                 val buttons = getCustomButtons.getAll()
@@ -554,6 +601,14 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun updateReadAhead(value: Long) {
         _readAhead.update { value.toFloat() }
+    }
+
+    fun updateCacheSpeed(bytesPerSecond: Long) {
+        cacheSpeed.update { bytesPerSecond }
+    }
+
+    fun updateBufferingPercent(percent: Int) {
+        bufferingPercent.update { percent }
     }
 
     private fun updatePausedState() {
@@ -1460,7 +1515,13 @@ class PlayerViewModel @JvmOverloads constructor(
      * Non-torrent videos are returned unchanged.
      */
     private suspend fun resolveTorrentIfNeeded(video: Video): Video? {
-        if (!isTorrentVideoUrl(video.videoUrl)) return video
+        if (!isTorrentVideoUrl(video.videoUrl)) {
+            // Either not a torrent, or one that was already resolved and is being played again.
+            torrentHash.value = TorrentServerUtils.streamHash(video.videoUrl)
+            return video
+        }
+        // Known already for a magnet, so the status can show while the server fetches its metadata.
+        torrentHash.value = video.videoUrl.substringAfter("btih:", "").substringBefore('&').ifBlank { null }
 
         // Don't log the raw URL: torrent magnets can embed private-tracker passkeys.
         logcat(LogPriority.INFO) { "[Torrent] detected torrent video, resolving via local server" }
@@ -1468,6 +1529,7 @@ class PlayerViewModel @JvmOverloads constructor(
             try {
                 if (!activity.ensureTorrentServerRunning()) {
                     logcat(LogPriority.ERROR) { "[Torrent] torrent server did not start in time" }
+                    activity.showToast(activity.stringResource(AYMR.strings.torrent_error_server))
                     return@withIOContext null
                 }
 
@@ -1477,9 +1539,19 @@ class PlayerViewModel @JvmOverloads constructor(
                     title = video.quality,
                     save = false,
                 )
-                video.copy(videoUrl = TorrentServerUtils.getTorrentPlayLink(torrent, index))
+                torrentHash.value = torrent.hash
+                video.copy(
+                    videoUrl = TorrentServerUtils.getTorrentPlayLink(torrent, index),
+                    // The server sends nothing until peers deliver the piece, which on a seek into a
+                    // poorly seeded torrent can outlast mpv's default of a minute and end playback.
+                    mpvArgs = video.mpvArgs + ("network-timeout" to TORRENT_NETWORK_TIMEOUT_SECONDS),
+                )
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: SocketTimeoutException) {
+                logcat(LogPriority.ERROR, e) { "[Torrent] no metadata in time (dead torrent)" }
+                activity.showToast(activity.stringResource(AYMR.strings.torrent_error_no_peers))
+                null
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e) { "[Torrent] failed to resolve torrent video" }
                 null
@@ -2171,3 +2243,18 @@ fun CustomButton.executeLongPress() {
 fun Float.normalize(inMin: Float, inMax: Float, outMin: Float, outMax: Float): Float {
     return (this - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
 }
+
+/**
+ * @property bytesPerSecond how fast mpv's cache is filling.
+ * @property bufferingPercent how far along mpv is to resuming, when it paused to buffer.
+ * @property torrent state of the torrent being played, if any.
+ */
+@Immutable
+data class PlayerLoadingStatus(
+    val bytesPerSecond: Long,
+    val bufferingPercent: Int,
+    val torrent: TorrentLoadStatus?,
+)
+
+private const val TORRENT_STATUS_INTERVAL_MS = 1_500L
+private const val TORRENT_NETWORK_TIMEOUT_SECONDS = "180"
