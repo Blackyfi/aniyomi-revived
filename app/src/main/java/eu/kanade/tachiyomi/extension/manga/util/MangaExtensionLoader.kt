@@ -10,6 +10,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import dalvik.system.PathClassLoader
 import eu.kanade.domain.extension.manga.interactor.TrustMangaExtension
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.extension.extensionInitDispatcher
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
 import eu.kanade.tachiyomi.extension.manga.model.MangaLoadResult
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
@@ -316,26 +318,30 @@ internal object MangaExtensionLoader {
             }
             .flatMap {
                 try {
-                    when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
-                        is MangaSource -> listOf(obj)
-                        is SourceFactory -> obj.createSources()
-                        else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                    withContext(extensionInitDispatcher) {
+                        when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
+                            is MangaSource -> listOf(obj)
+                            is SourceFactory -> obj.createSources()
+                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                        }
                     }
                 } catch (e: LinkageError) {
                     try {
                         val fallBackClassLoader = PathClassLoader(appInfo.sourceDir, null, context.classLoader)
-                        when (
-                            val obj = Class.forName(
-                                it,
-                                false,
-                                fallBackClassLoader,
-                            ).getDeclaredConstructor().newInstance()
-                        ) {
-                            is MangaSource -> {
-                                listOf(obj)
+                        withContext(extensionInitDispatcher) {
+                            when (
+                                val obj = Class.forName(
+                                    it,
+                                    false,
+                                    fallBackClassLoader,
+                                ).getDeclaredConstructor().newInstance()
+                            ) {
+                                is MangaSource -> {
+                                    listOf(obj)
+                                }
+                                is SourceFactory -> obj.createSources()
+                                else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                             }
-                            is SourceFactory -> obj.createSources()
-                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                         }
                     } catch (e: Throwable) {
                         logcat(LogPriority.ERROR, e) { "Extension load error: $extName ($it)" }

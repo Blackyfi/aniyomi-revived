@@ -15,6 +15,7 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.AnimeSourceFactory
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
+import eu.kanade.tachiyomi.extension.extensionInitDispatcher
 import eu.kanade.tachiyomi.util.lang.Hash
 import eu.kanade.tachiyomi.util.storage.copyAndSetReadOnlyTo
 import eu.kanade.tachiyomi.util.system.ChildFirstPathClassLoader
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
@@ -306,26 +308,30 @@ internal object AnimeExtensionLoader {
             }
             .flatMap {
                 try {
-                    when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
-                        is AnimeSource -> listOf(obj)
-                        is AnimeSourceFactory -> obj.createSources()
-                        else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                    withContext(extensionInitDispatcher) {
+                        when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
+                            is AnimeSource -> listOf(obj)
+                            is AnimeSourceFactory -> obj.createSources()
+                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                        }
                     }
                 } catch (e: LinkageError) {
                     try {
                         val fallBackClassLoader = PathClassLoader(appInfo.sourceDir, null, context.classLoader)
-                        when (
-                            val obj = Class.forName(
-                                it,
-                                false,
-                                fallBackClassLoader,
-                            ).getDeclaredConstructor().newInstance()
-                        ) {
-                            is AnimeSource -> {
-                                listOf(obj)
+                        withContext(extensionInitDispatcher) {
+                            when (
+                                val obj = Class.forName(
+                                    it,
+                                    false,
+                                    fallBackClassLoader,
+                                ).getDeclaredConstructor().newInstance()
+                            ) {
+                                is AnimeSource -> {
+                                    listOf(obj)
+                                }
+                                is AnimeSourceFactory -> obj.createSources()
+                                else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                             }
-                            is AnimeSourceFactory -> obj.createSources()
-                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                         }
                     } catch (e: Throwable) {
                         logcat(LogPriority.ERROR, e) { "Extension load error: $extName ($it)" }
