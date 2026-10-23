@@ -241,7 +241,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
                 add(MangaCoverKeyer())
             }
 
-            crossfade((300 * this@App.animatorDurationScale).toInt())
+            crossfade((150 * this@App.animatorDurationScale).toInt())
             allowRgb565(DeviceUtil.isLowRamDevice(this@App))
             if (networkPreferences.verboseLogging().get()) logger(DebugLogger())
 
