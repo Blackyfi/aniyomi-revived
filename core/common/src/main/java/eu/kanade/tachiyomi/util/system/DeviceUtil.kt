@@ -93,10 +93,13 @@ object DeviceUtil {
      * considering how heavy image processing can be.
      */
     fun isLowRamDevice(context: Context): Boolean {
+        return deviceTier(context) == DeviceTier.LOW
+    }
+
+    fun deviceTier(context: Context): DeviceTier {
         val memInfo = ActivityManager.MemoryInfo()
         context.getSystemService<ActivityManager>()!!.getMemoryInfo(memInfo)
-        val totalMemBytes = memInfo.totalMem
-        return totalMemBytes < 3L * 1024 * 1024 * 1024
+        return DeviceTier.fromTotalMemory(memInfo.totalMem)
     }
 
     @SuppressLint("PrivateApi")
