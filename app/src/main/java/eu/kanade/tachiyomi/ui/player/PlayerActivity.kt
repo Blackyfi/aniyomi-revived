@@ -236,14 +236,6 @@ class PlayerActivity : BaseActivity() {
         setupMediaSession()
         setupPlayerOrientation()
 
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
-            runOnUiThread {
-                toast(throwable.message)
-            }
-            logcat(LogPriority.ERROR, throwable)
-            finish()
-        }
-
         viewModel.eventFlow
             .onEach { event ->
                 when (event) {
