@@ -58,6 +58,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
+import eu.kanade.presentation.components.LoadFailureAction
+import eu.kanade.presentation.components.LoadFailureOverlay
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
 import eu.kanade.tachiyomi.ui.player.Dialogs
@@ -85,6 +87,8 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
@@ -565,6 +569,29 @@ fun PlayerControls(
         val selectedSubtitles by viewModel.selectedSubtitles.collectAsState()
         val audioTracks by viewModel.audioTracks.collectAsState()
         val selectedAudio by viewModel.selectedAudio.collectAsState()
+        val playbackError by viewModel.playbackError.collectAsState()
+        val playerActivity = LocalContext.current as PlayerActivity
+        playbackError?.let { message ->
+            val webViewOpener = remember(message) { playerActivity.episodeWebViewOpener() }
+            LoadFailureOverlay(
+                message = message,
+                actions = buildList {
+                    add(LoadFailureAction(stringResource(MR.strings.action_retry), playerActivity::retryPlayback))
+                    if (viewModel.hosterState.value.isNotEmpty()) {
+                        add(
+                            LoadFailureAction(stringResource(AYMR.strings.player_action_switch_host)) {
+                                viewModel.showSheet(Sheets.QualityTracks)
+                            },
+                        )
+                    }
+                    webViewOpener?.let {
+                        add(LoadFailureAction(stringResource(MR.strings.action_open_in_web_view), it))
+                    }
+                    add(LoadFailureAction(stringResource(MR.strings.action_close), playerActivity::finish))
+                },
+            )
+        }
+
         val isLoadingHosters by viewModel.isLoadingHosters.collectAsState()
         val hosterState by viewModel.hosterState.collectAsState()
         val expandedState by viewModel.hosterExpandedList.collectAsState()

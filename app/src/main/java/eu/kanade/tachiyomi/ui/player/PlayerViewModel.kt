@@ -267,6 +267,11 @@ class PlayerViewModel @JvmOverloads constructor(
     private val torrentHash = MutableStateFlow<String?>(null)
     private val torrentStatus = MutableStateFlow<TorrentLoadStatus?>(null)
 
+    private val _playbackError = MutableStateFlow<String?>(null)
+
+    /** Why there's nothing to play, while the player stays open offering a way out. */
+    val playbackError = _playbackError.asStateFlow()
+
     private val _paused = MutableStateFlow(false)
     val paused = _paused.asStateFlow()
 
@@ -604,6 +609,17 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun updateReadAhead(value: Long) {
         _readAhead.update { value.toFloat() }
+    }
+
+    fun showPlaybackError(message: String) {
+        _playbackError.value = message
+        isLoading.update { _ -> false }
+        updateIsLoadingEpisode(false)
+        updateIsLoadingHosters(false)
+    }
+
+    fun clearPlaybackError() {
+        _playbackError.value = null
     }
 
     fun updateCacheSpeed(bytesPerSecond: Long) {
@@ -1016,6 +1032,9 @@ class PlayerViewModel @JvmOverloads constructor(
         _hosterList.update { _ -> emptyList() }
         _hosterExpandedList.update { _ -> emptyList() }
         _selectedHosterVideoIndex.update { _ -> Pair(-1, -1) }
+        // loadVideo only falls back to another hoster when nothing is playing, so the last episode's
+        // video left here turned a failed video in this one into an endless spinner.
+        _currentVideo.update { _ -> null }
     }
 
     fun changeEpisode(previous: Boolean, autoPlay: Boolean = false) {
@@ -1464,6 +1483,9 @@ class PlayerViewModel @JvmOverloads constructor(
                 }
 
                 throw e
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e) { "Failed to load hosters" }
+                showPlaybackError(activity.describeError(e))
             }
         }
     }
@@ -1704,6 +1726,7 @@ class PlayerViewModel @JvmOverloads constructor(
         val hosterList: List<Hoster>?,
         val episodeTitle: String,
         val source: AnimeSource,
+        val error: Throwable? = null,
     )
 
     suspend fun loadEpisode(episodeId: Long?): EpisodeLoadResult? {
@@ -1716,6 +1739,7 @@ class PlayerViewModel @JvmOverloads constructor(
         updateEpisode(chosenEpisode)
 
         return withIOContext {
+            var error: Throwable? = null
             try {
                 val currentEpisode =
                     currentEpisode.value
@@ -1727,14 +1751,20 @@ class PlayerViewModel @JvmOverloads constructor(
                 )
 
                 this@PlayerViewModel.episodeId = currentEpisode.id!!
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e) { e.message ?: "Error getting links" }
+                error = e
+                // Not the previous episode's list, which would play that episode's videos for this one.
+                currentHosterList = null
             }
 
             EpisodeLoadResult(
                 hosterList = currentHosterList,
                 episodeTitle = anime.title + " - " + chosenEpisode.name,
                 source = source,
+                error = error,
             )
         }
     }

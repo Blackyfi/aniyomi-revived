@@ -78,6 +78,7 @@ import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
+import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
@@ -208,6 +209,8 @@ class PlayerActivity : BaseActivity() {
                 withUIContext {
                     setInitialEpisodeError(exception)
                 }
+                viewModel.updateIsLoadingHosters(false)
+                return@launchNonCancellable
             }
 
             viewModel.updateIsLoadingHosters(false)
@@ -797,6 +800,8 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         when (eventId) {
             MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
+                // Failure of the file this one replaced can be delivered after the switch was made.
+                viewModel.clearPlaybackError()
                 viewModel.viewModelScope.launchIO { fileLoaded() }
             }
             MPVLib.mpvEventId.MPV_EVENT_SEEK -> viewModel.isLoading.update { true }
@@ -1049,6 +1054,7 @@ class PlayerActivity : BaseActivity() {
         viewModel.panelShown.update { _ -> Panels.None }
         viewModel.pause()
         viewModel.isLoading.update { _ -> true }
+        viewModel.clearPlaybackError()
         viewModel.resetHosterState()
 
         lifecycleScope.launch {
@@ -1089,6 +1095,7 @@ class PlayerActivity : BaseActivity() {
                         }
                     } else {
                         logcat(LogPriority.ERROR) { "Error getting links" }
+                        setInitialEpisodeError(switchMethod.error ?: IllegalStateException("Error getting links"))
                     }
 
                     if (isInPictureInPictureMode && pipEpisodeToasts) {
@@ -1110,6 +1117,7 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         if (video == null) return
 
+        viewModel.clearPlaybackError()
         setHttpOptions(video)
 
         if (viewModel.isLoadingEpisode.value) {
@@ -1145,17 +1153,46 @@ class PlayerActivity : BaseActivity() {
     }
 
     /**
-     * Called from the presenter if the initial load couldn't load the videos of the episode. In
-     * this case the activity is closed and a toast is shown to the user.
+     * Called from the presenter if it couldn't load the videos of the episode. The user gets the
+     * cause and a way to retry, unless there's no episode to retry, which closes the activity.
      */
     private fun setInitialEpisodeError(error: Throwable) {
-        if (error is PlayerViewModel.ExceptionWithStringResource) {
-            toast(error.stringResource)
-        } else {
-            toast(error.message)
-        }
         logcat(LogPriority.ERROR, error)
-        finish()
+        if (viewModel.currentEpisode.value == null) {
+            toast(describeError(error))
+            finish()
+        } else {
+            viewModel.showPlaybackError(describeError(error))
+        }
+    }
+
+    internal fun onPlaybackFailed(message: String) {
+        viewModel.showPlaybackError(message)
+    }
+
+    internal fun describeError(error: Throwable): String {
+        return if (error is PlayerViewModel.ExceptionWithStringResource) {
+            stringResource(error.stringResource)
+        } else {
+            error.message ?: error.javaClass.simpleName
+        }
+    }
+
+    /** Tries the episode again from its hosters, as the links of the failed attempt may have expired. */
+    fun retryPlayback() {
+        changeEpisode(viewModel.currentEpisode.value?.id)
+    }
+
+    /** Null when the episode has no page to open. */
+    fun episodeWebViewOpener(): (() -> Unit)? {
+        val source = viewModel.currentSource.value as? AnimeHttpSource ?: return null
+        val episode = viewModel.currentEpisode.value ?: return null
+        val url = runCatching { source.getEpisodeUrl(episode) }.getOrNull() ?: return null
+        return {
+            startActivity(
+                WebViewActivity.newIntent(this, url, source.id, viewModel.currentAnime.value?.title, isAnime = true),
+            )
+        }
     }
 
     fun parseVideoUrl(videoUrl: String?): String? {
