@@ -19,6 +19,7 @@ import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.NavigationRegion
+import eu.kanade.tachiyomi.util.system.DeviceUtil
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import tachiyomi.core.common.util.system.logcat
@@ -79,7 +80,9 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
             .threshold
 
     init {
-        recycler.setItemViewCacheSize(RECYCLER_VIEW_CACHE_SIZE)
+        recycler.setItemViewCacheSize(
+            if (DeviceUtil.isLowRamDevice(activity)) LOW_RAM_RECYCLER_VIEW_CACHE_SIZE else RECYCLER_VIEW_CACHE_SIZE,
+        )
         recycler.isVisible = false // Don't let the recycler layout yet
         recycler.layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
         recycler.isFocusable = false
@@ -363,3 +366,6 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
 
 // Double the cache size to reduce rebinds/recycles incurred by the extra layout space on scroll direction changes
 private const val RECYCLER_VIEW_CACHE_SIZE = 4
+
+// Cached holders keep their decoded page, so low memory devices stay on the RecyclerView default
+private const val LOW_RAM_RECYCLER_VIEW_CACHE_SIZE = 2
