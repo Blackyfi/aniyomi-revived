@@ -52,4 +52,4 @@ enum class ItemCover(val ratio: Float) {
     }
 }
 
-private val CoverPlaceholderColor = Color(0x1F888888)
+internal val CoverPlaceholderColor = Color(0x1F888888)
