@@ -45,6 +45,7 @@ import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
+import eu.kanade.tachiyomi.ui.library.manga.ManhwaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.coroutines.channels.Channel
@@ -67,7 +68,8 @@ import uy.kohesive.injekt.injectLazy
 
 object HomeScreen : Screen() {
 
-    private val librarySearchEvent = Channel<String>()
+    // Sent while the entry screen is on its way out, so it must not depend on that screen's scope.
+    private val librarySearchEvent = Channel<Pair<LibraryTarget, String>>(Channel.CONFLATED)
     private val openTabEvent = Channel<Tab>()
     private val showBottomNavEvent = Channel<Boolean>()
 
@@ -157,12 +159,20 @@ object HomeScreen : Screen() {
 
             LaunchedEffect(Unit) {
                 launch {
-                    librarySearchEvent.receiveAsFlow().collectLatest {
-                        goToStartScreen()
-                        when (defaultTab) {
-                            AnimeLibraryTab -> AnimeLibraryTab.search(it)
-                            MangaLibraryTab -> MangaLibraryTab.search(it)
-                            else -> {}
+                    librarySearchEvent.receiveAsFlow().collectLatest { (target, query) ->
+                        when (target) {
+                            LibraryTarget.ANIME -> {
+                                tabNavigator.current = AnimeLibraryTab
+                                AnimeLibraryTab.search(query)
+                            }
+                            LibraryTarget.MANGA -> {
+                                tabNavigator.current = MangaLibraryTab
+                                MangaLibraryTab.search(query)
+                            }
+                            LibraryTarget.MANHWA -> {
+                                tabNavigator.current = ManhwaLibraryTab
+                                ManhwaLibraryTab.search(query)
+                            }
                         }
                     }
                 }
@@ -322,8 +332,11 @@ object HomeScreen : Screen() {
         }
     }
 
-    suspend fun search(query: String) {
-        librarySearchEvent.send(query)
+    /**
+     * Shows [target]'s library, whichever tab is open now, and searches it for [query].
+     */
+    fun search(target: LibraryTarget, query: String) {
+        librarySearchEvent.trySend(target to query)
     }
 
     suspend fun openTab(tab: Tab) {
@@ -333,6 +346,8 @@ object HomeScreen : Screen() {
     suspend fun showBottomNav(show: Boolean) {
         showBottomNavEvent.send(show)
     }
+
+    enum class LibraryTarget { ANIME, MANGA, MANHWA }
 
     sealed interface Tab {
         data class AnimeLib(val animeIdToOpen: Long? = null) : Tab
