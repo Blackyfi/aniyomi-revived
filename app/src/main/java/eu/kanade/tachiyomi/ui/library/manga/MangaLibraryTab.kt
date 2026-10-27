@@ -182,7 +182,7 @@ internal fun MangaLibraryTabContent(
                 onClickFilter = screenModel::showSettingsDialog,
                 onClickRefresh = {
                     onClickRefresh(
-                        state.categories[screenModel.activeCategoryIndex],
+                        state.categories.getOrNull(screenModel.activeCategoryIndex),
                     )
                 },
                 onClickGlobalUpdate = { onClickRefresh(null) },

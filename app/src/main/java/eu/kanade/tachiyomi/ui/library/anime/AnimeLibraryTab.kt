@@ -142,7 +142,7 @@ data object AnimeLibraryTab : Tab {
                     onClickFilter = screenModel::showSettingsDialog,
                     onClickRefresh = {
                         onClickRefresh(
-                            state.categories[screenModel.activeCategoryIndex],
+                            state.categories.getOrNull(screenModel.activeCategoryIndex),
                         )
                     },
                     onClickGlobalUpdate = { onClickRefresh(null) },
@@ -216,7 +216,13 @@ data object AnimeLibraryTab : Tab {
                         onContinueWatchingClicked = { it: LibraryAnime ->
                             scope.launchIO {
                                 val episode = screenModel.getNextUnseenEpisode(it.anime)
-                                if (episode != null) openEpisode(episode)
+                                if (episode != null) {
+                                    openEpisode(episode)
+                                } else {
+                                    snackbarHostState.showSnackbar(
+                                        context.stringResource(AYMR.strings.no_next_episode),
+                                    )
+                                }
                             }
                             Unit
                         }.takeIf { state.showAnimeContinueButton },

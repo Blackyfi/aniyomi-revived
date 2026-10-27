@@ -25,7 +25,8 @@ import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.library.itemsBetween
+import eu.kanade.tachiyomi.ui.library.meanTrackerScore
 import eu.kanade.tachiyomi.ui.main.whileMainUiVisible
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
@@ -292,7 +293,7 @@ open class MangaLibraryScreenModel(
                     else ->
                         entry.value
                             .mapNotNull { trackerMap[it.trackerId]?.mangaService?.get10PointScore(it) }
-                            .average()
+                            .let(::meanTrackerScore)
                 }
             }
         }
@@ -616,10 +617,8 @@ open class MangaLibraryScreenModel(
 
             if (deleteChapters) {
                 mangaToDelete.forEach { manga ->
-                    val source = sourceManager.get(manga.source) as? HttpSource
-                    if (source != null) {
-                        downloadManager.deleteManga(manga, source)
-                    }
+                    // A stub still resolves the folder when the extension has been uninstalled
+                    downloadManager.deleteManga(manga, sourceManager.getOrStub(manga.source))
                 }
             }
         }
@@ -667,11 +666,11 @@ open class MangaLibraryScreenModel(
     }
 
     suspend fun getRandomLibraryItemForCurrentCategory(): MangaLibraryItem? {
-        if (state.value.categories.isEmpty()) return null
+        val category = state.value.categories.getOrNull(activeCategoryIndex) ?: return null
 
         return withIOContext {
             state.value
-                .getLibraryItemsByCategoryId(state.value.categories[activeCategoryIndex].id)
+                .getLibraryItemsByCategoryId(category.id)
                 ?.randomOrNull()
         }
     }
@@ -712,19 +711,9 @@ open class MangaLibraryScreenModel(
 
                 val items = state.getLibraryItemsByCategoryId(manga.category)
                     ?.fastMap { it.libraryManga }.orEmpty()
-                val lastMangaIndex = items.indexOf(lastSelected)
-                val curMangaIndex = items.indexOf(manga)
-
                 val selectedIds = list.fastMap { it.id }
-                val selectionRange = when {
-                    lastMangaIndex < curMangaIndex -> IntRange(lastMangaIndex, curMangaIndex)
-                    curMangaIndex < lastMangaIndex -> IntRange(curMangaIndex, lastMangaIndex)
-                    // We shouldn't reach this point
-                    else -> return@mutate
-                }
-                val newSelections = selectionRange.mapNotNull { index ->
-                    items[index].takeUnless { it.id in selectedIds }
-                }
+                val newSelections = itemsBetween(items, { it.id }, lastSelected.id, manga.id)
+                    .filterNot { it.id in selectedIds }
                 list.addAll(newSelections)
             }
             state.copy(selection = newSelection)
@@ -749,7 +738,7 @@ open class MangaLibraryScreenModel(
     fun invertSelection(index: Int) {
         mutableState.update { state ->
             val newSelection = state.selection.mutate { list ->
-                val categoryId = state.categories[index].id
+                val categoryId = state.categories.getOrNull(index)?.id ?: return@mutate
                 val items = state.getLibraryItemsByCategoryId(categoryId)?.fastMap { it.libraryManga }.orEmpty()
                 val selectedIds = list.fastMap { it.id }
                 val (toRemove, toAdd) = items.fastPartition { it.id in selectedIds }
