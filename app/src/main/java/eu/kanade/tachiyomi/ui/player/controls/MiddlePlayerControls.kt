@@ -81,6 +81,7 @@ fun MiddlePlayerControls(
                 ControlsButton(
                     Icons.Filled.SkipPrevious,
                     onClick = onSkipPrevious,
+                    title = stringResource(AYMR.strings.player_action_previous_episode),
                     iconSize = 48.dp,
                     enabled = hasPrevious,
                 )
@@ -142,7 +143,9 @@ fun MiddlePlayerControls(
                                 onClick = onPlayPauseClick,
                             )
                             .padding(MaterialTheme.padding.medium),
-                        contentDescription = null,
+                        contentDescription = stringResource(
+                            if (paused) AYMR.strings.player_action_play else AYMR.strings.player_action_pause,
+                        ),
                     )
                 }
             }
@@ -157,6 +160,7 @@ fun MiddlePlayerControls(
                 ControlsButton(
                     Icons.Filled.SkipNext,
                     onClick = onSkipNext,
+                    title = stringResource(AYMR.strings.player_action_next_episode),
                     iconSize = 48.dp,
                     enabled = hasNext,
                 )

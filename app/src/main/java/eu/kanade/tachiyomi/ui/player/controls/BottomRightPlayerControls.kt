@@ -28,6 +28,8 @@ import eu.kanade.tachiyomi.ui.player.controls.components.FilledControlsButton
 import eu.kanade.tachiyomi.ui.player.execute
 import eu.kanade.tachiyomi.ui.player.executeLongPress
 import tachiyomi.domain.custombuttons.model.CustomButton
+import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.presentation.core.i18n.stringResource
 
 @Composable
 fun BottomRightPlayerControls(
@@ -59,12 +61,14 @@ fun BottomRightPlayerControls(
             ControlsButton(
                 Icons.Default.PictureInPictureAlt,
                 onClick = onPipClick,
+                title = stringResource(AYMR.strings.player_action_pip),
             )
         }
 
         ControlsButton(
             Icons.Default.AspectRatio,
             onClick = onAspectClick,
+            title = stringResource(AYMR.strings.player_action_aspect),
         )
     }
 }

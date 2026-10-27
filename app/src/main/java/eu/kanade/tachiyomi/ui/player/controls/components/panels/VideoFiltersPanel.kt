@@ -113,7 +113,7 @@ fun FiltersCard(
                 ) {
                     Text(text = stringResource(MR.strings.action_reset))
                 }
-                ControlsButton(Icons.Default.Close, onClose)
+                ControlsButton(Icons.Default.Close, onClose, title = stringResource(MR.strings.action_close))
             }
         }
         LazyColumn {
