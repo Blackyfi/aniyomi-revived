@@ -45,6 +45,7 @@ internal fun MangaLibraryCompactGrid(
             EntryCompactGridItem(
                 isSelected = selectedIds.contains(libraryItem.libraryManga.id),
                 title = manga.title.takeIf { showTitle },
+                coverContentDescription = manga.title.takeUnless { showTitle },
                 coverData = MangaCover(
                     mangaId = manga.id,
                     sourceId = manga.source,

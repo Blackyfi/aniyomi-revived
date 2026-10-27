@@ -25,7 +25,7 @@ enum class ItemCover(val ratio: Float) {
     operator fun invoke(
         data: Any?,
         modifier: Modifier = Modifier,
-        contentDescription: String = "",
+        contentDescription: String? = null,
         shape: Shape = MaterialTheme.shapes.extraSmall,
         onClick: (() -> Unit)? = null,
     ) {

@@ -45,6 +45,7 @@ fun AnimeLibraryCompactGrid(
             EntryCompactGridItem(
                 isSelected = selectedIds.contains(libraryItem.libraryAnime.id),
                 title = anime.title.takeIf { showTitle },
+                coverContentDescription = anime.title.takeUnless { showTitle },
                 coverData = AnimeCover(
                     animeId = anime.id,
                     sourceId = anime.source,
