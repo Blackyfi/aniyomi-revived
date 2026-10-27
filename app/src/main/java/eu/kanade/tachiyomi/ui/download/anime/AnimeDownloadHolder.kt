@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.download.anime
 
 import android.view.View
 import androidx.recyclerview.widget.ItemTouchHelper
+import com.google.android.material.color.MaterialColors
 import eu.davidea.viewholders.FlexibleViewHolder
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
@@ -22,6 +23,7 @@ class AnimeDownloadHolder(private val view: View, val adapter: AnimeDownloadAdap
     FlexibleViewHolder(view, adapter) {
 
     private val binding = DownloadItemBinding.bind(view)
+    private val defaultProgressTextColor = binding.downloadProgressText.textColors
 
     init {
         setDragHandleView(binding.reorder)
@@ -52,6 +54,29 @@ class AnimeDownloadHolder(private val view: View, val adapter: AnimeDownloadAdap
         } else {
             binding.downloadProgress.max = 100
             notifyProgress()
+            notifyDownloadedPages()
+        }
+        notifyStatus()
+    }
+
+    /**
+     * Marks a failed download, which otherwise keeps its progress animation running.
+     */
+    fun notifyStatus() {
+        val failed = download.status == AnimeDownload.State.ERROR
+        if (failed) {
+            binding.downloadProgressText.setTextColor(
+                MaterialColors.getColor(view, com.google.android.material.R.attr.colorError),
+            )
+        } else {
+            binding.downloadProgressText.setTextColor(defaultProgressTextColor)
+        }
+        if (failed) {
+            binding.downloadProgress.isIndeterminate = false
+            binding.downloadProgressText.text = view.context.stringResource(MR.strings.chapter_error)
+        } else if (download.video == null) {
+            binding.downloadProgressText.text = ""
+        } else {
             notifyDownloadedPages()
         }
     }

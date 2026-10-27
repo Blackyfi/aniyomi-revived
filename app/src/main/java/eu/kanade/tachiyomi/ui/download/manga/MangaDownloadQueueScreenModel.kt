@@ -200,7 +200,12 @@ class MangaDownloadQueueScreenModel(
                 onUpdateProgress(download)
                 onUpdateDownloadedPages(download)
             }
-            MangaDownload.State.ERROR -> cancelProgressJob(download)
+            MangaDownload.State.ERROR -> {
+                cancelProgressJob(download)
+                getHolder(download)?.notifyStatus()
+            }
+            // A failed download going back in the queue after resuming
+            MangaDownload.State.QUEUE -> getHolder(download)?.notifyStatus()
             else -> {
                 /* unused */
             }
