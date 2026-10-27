@@ -717,6 +717,9 @@ class PlayerViewModel @JvmOverloads constructor(
             0,
         )
         currentVolume.update { newVolume }
+        if (playerPreferences.rememberPlayerVolume().get()) {
+            playerPreferences.playerVolumeValue().set(newVolume.toFloat())
+        }
     }
 
     fun changeMPVVolumeTo(volume: Int) {
