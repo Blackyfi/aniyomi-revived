@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
 import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionInstallReceiver
 import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionInstaller
 import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionLoader
+import eu.kanade.tachiyomi.util.system.doOnTrimMemoryBackground
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,7 @@ import tachiyomi.i18n.MR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The manager of anime extensions installed as another apk which extend the available sources. It handles
@@ -63,7 +65,7 @@ class AnimeExtensionManager(
      */
     private val installer by lazy { AnimeExtensionInstaller(context) }
 
-    private val iconMap = mutableMapOf<String, Drawable>()
+    private val iconMap = ConcurrentHashMap<String, Drawable>()
 
     private val installedExtensionsMapFlow = MutableStateFlow(emptyMap<String, AnimeExtension.Installed>())
     val installedExtensionsFlow = installedExtensionsMapFlow.mapExtensions(scope)
@@ -77,6 +79,7 @@ class AnimeExtensionManager(
     init {
         initAnimeExtensions()
         AnimeExtensionInstallReceiver(AnimeInstallationListener()).register(context)
+        context.doOnTrimMemoryBackground { iconMap.clear() }
     }
 
     private var subLanguagesEnabledOnFirstRun = preferences.enabledLanguages().isSet()

@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.extension.manga.model.MangaLoadResult
 import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionInstallReceiver
 import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionInstaller
 import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionLoader
+import eu.kanade.tachiyomi.util.system.doOnTrimMemoryBackground
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,7 @@ import tachiyomi.i18n.MR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The manager of extensions installed as another apk which extend the available sources. It handles
@@ -60,7 +62,7 @@ class MangaExtensionManager(
      */
     private val installer by lazy { MangaExtensionInstaller(context) }
 
-    private val iconMap = mutableMapOf<String, Drawable>()
+    private val iconMap = ConcurrentHashMap<String, Drawable>()
 
     private val installedExtensionsMapFlow = MutableStateFlow(emptyMap<String, MangaExtension.Installed>())
     val installedExtensionsFlow = installedExtensionsMapFlow.mapExtensions(scope)
@@ -74,6 +76,7 @@ class MangaExtensionManager(
     init {
         initExtensions()
         MangaExtensionInstallReceiver(InstallationListener()).register(context)
+        context.doOnTrimMemoryBackground { iconMap.clear() }
     }
 
     private var subLanguagesEnabledOnFirstRun = preferences.enabledLanguages().isSet()
