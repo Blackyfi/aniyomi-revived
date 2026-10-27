@@ -299,6 +299,38 @@ class ReaderViewModel @JvmOverloads constructor(
         }
     }
 
+    fun showInitialLoadError(message: String) {
+        mutableState.update { it.copy(initialLoadError = message) }
+    }
+
+    /**
+     * Attempts the load that [init] failed at again, reporting failure the same way.
+     */
+    suspend fun retryInit(): Result<Boolean> {
+        val loader = loader ?: return Result.failure(IllegalStateException("Reader not initialized"))
+        mutableState.update { it.copy(initialLoadError = null, isLoadingAdjacentChapter = true) }
+        return withIOContext {
+            try {
+                loadChapter(loader, chapterList.first { chapterId == it.chapter.id })
+                Result.success(true)
+            } catch (e: Throwable) {
+                if (e is CancellationException) {
+                    throw e
+                }
+                Result.failure(e)
+            } finally {
+                mutableState.update { it.copy(isLoadingAdjacentChapter = false) }
+            }
+        }
+    }
+
+    /** The URL of the chapter being opened, which [getChapterUrl] can't know until it has loaded. */
+    fun getInitialChapterUrl(): String? {
+        val source = getSource() ?: return null
+        val chapter = chapterList.firstOrNull { chapterId == it.chapter.id }?.chapter ?: return null
+        return runCatching { source.getChapterUrl(chapter) }.getOrNull()
+    }
+
     /**
      * Loads the given [chapter] with this [loader] and updates the currently active chapters.
      * Callers must handle errors.
@@ -958,6 +990,7 @@ class ReaderViewModel @JvmOverloads constructor(
         val viewerChapters: ViewerChapters? = null,
         val bookmarked: Boolean = false,
         val isLoadingAdjacentChapter: Boolean = false,
+        val initialLoadError: String? = null,
         val currentPage: Int = -1,
 
         /**
