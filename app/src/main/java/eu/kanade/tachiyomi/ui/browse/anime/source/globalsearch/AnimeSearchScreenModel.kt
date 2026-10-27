@@ -132,6 +132,7 @@ abstract class AnimeSearchScreenModel(
         this.lastQuery = query
         this.lastSourceFilter = sourceFilter
 
+        searchJob?.cancel()
         val sources = getSelectedSources()
 
         // Reuse previous results if possible
