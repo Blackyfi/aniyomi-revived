@@ -151,7 +151,7 @@ fun Screen.mangaHistoryTab(
                         screenModel = MigrateMangaDialogScreenModel(),
                         onDismissRequest = onDismissRequest,
                         onClickTitle = { navigator.push(MangaScreen(dialog.oldManga.id)) },
-                        onPopScreen = { navigator.replace(MangaScreen(dialog.newManga.id)) },
+                        onPopScreen = { navigator.push(MangaScreen(dialog.newManga.id)) },
                     )
                 }
                 null -> {}
