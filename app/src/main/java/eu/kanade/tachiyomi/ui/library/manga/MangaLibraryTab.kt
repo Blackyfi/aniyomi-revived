@@ -224,7 +224,9 @@ internal fun MangaLibraryTabContent(
     ) { contentPadding ->
         when {
             state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
-            state.searchQuery.isNullOrEmpty() && !state.hasActiveFilters && state.isLibraryEmpty &&
+            state.searchQuery.isNullOrEmpty() &&
+                !state.hasActiveFilters &&
+                state.isLibraryEmpty &&
                 state.downloadedOnly -> {
                 EmptyScreen(
                     stringRes = AYMR.strings.library_downloaded_only_empty,
