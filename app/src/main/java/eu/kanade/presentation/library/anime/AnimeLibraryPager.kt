@@ -21,11 +21,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.GlobalSearchItem
+import eu.kanade.presentation.library.components.libraryEmptyActions
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
 import kotlinx.collections.immutable.ImmutableSet
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.util.plus
 
@@ -34,6 +36,9 @@ fun AnimeLibraryPager(
     state: PagerState,
     contentPadding: PaddingValues,
     hasActiveFilters: Boolean,
+    downloadedOnly: Boolean,
+    onResetFilters: () -> Unit,
+    onShowAllEntries: () -> Unit,
     selectedIds: ImmutableSet<Long>,
     searchQuery: String?,
     onGlobalSearchClicked: () -> Unit,
@@ -63,8 +68,11 @@ fun AnimeLibraryPager(
                 LibraryPagerEmptyScreen(
                     searchQuery = searchQuery,
                     hasActiveFilters = hasActiveFilters,
+                    downloadedOnly = downloadedOnly,
                     contentPadding = contentPadding,
                     onGlobalSearchClicked = onGlobalSearchClicked,
+                    onResetFilters = onResetFilters,
+                    onShowAllEntries = onShowAllEntries,
                 )
                 return@HorizontalPager
             }
@@ -127,12 +135,16 @@ fun AnimeLibraryPager(
 private fun LibraryPagerEmptyScreen(
     searchQuery: String?,
     hasActiveFilters: Boolean,
+    downloadedOnly: Boolean,
     contentPadding: PaddingValues,
     onGlobalSearchClicked: () -> Unit,
+    onResetFilters: () -> Unit,
+    onShowAllEntries: () -> Unit,
 ) {
     val msg = when {
         !searchQuery.isNullOrEmpty() -> MR.strings.no_results_found
         hasActiveFilters -> MR.strings.error_no_match
+        downloadedOnly -> AYMR.strings.library_downloaded_only_empty
         else -> MR.strings.information_no_manga_category
     }
 
@@ -155,6 +167,7 @@ private fun LibraryPagerEmptyScreen(
         EmptyScreen(
             stringRes = msg,
             modifier = Modifier.weight(1f),
+            actions = libraryEmptyActions(hasActiveFilters, downloadedOnly, onResetFilters, onShowAllEntries),
         )
     }
 }

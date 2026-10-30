@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -36,6 +37,7 @@ import eu.kanade.presentation.entries.components.LibraryBottomActionMenu
 import eu.kanade.presentation.entries.manga.components.SetMangaTypeDialog
 import eu.kanade.presentation.library.DeleteLibraryEntryDialog
 import eu.kanade.presentation.library.components.LibraryToolbar
+import eu.kanade.presentation.library.components.libraryEmptyActions
 import eu.kanade.presentation.library.manga.MangaLibraryContent
 import eu.kanade.presentation.library.manga.MangaLibrarySettingsDialog
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
@@ -53,6 +55,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import tachiyomi.core.common.i18n.pluralStringResource
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.category.model.Category
@@ -221,6 +224,19 @@ internal fun MangaLibraryTabContent(
     ) { contentPadding ->
         when {
             state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
+            state.searchQuery.isNullOrEmpty() && !state.hasActiveFilters && state.isLibraryEmpty &&
+                state.downloadedOnly -> {
+                EmptyScreen(
+                    stringRes = AYMR.strings.library_downloaded_only_empty,
+                    modifier = Modifier.padding(contentPadding),
+                    actions = libraryEmptyActions(
+                        hasActiveFilters = false,
+                        downloadedOnly = true,
+                        onResetFilters = screenModel::resetFilters,
+                        onShowAllEntries = screenModel::showAllEntries,
+                    ),
+                )
+            }
             state.searchQuery.isNullOrEmpty() && !state.hasActiveFilters && state.isLibraryEmpty -> {
                 val handler = LocalUriHandler.current
                 EmptyScreen(
@@ -252,6 +268,9 @@ internal fun MangaLibraryTabContent(
                     contentPadding = contentPadding,
                     currentPage = { screenModel.activeCategoryIndex },
                     hasActiveFilters = state.hasActiveFilters,
+                    downloadedOnly = state.downloadedOnly,
+                    onResetFilters = screenModel::resetFilters,
+                    onShowAllEntries = screenModel::showAllEntries,
                     showPageTabs = state.showCategoryTabs || !state.searchQuery.isNullOrEmpty(),
                     onChangeCurrentPage = { screenModel.activeCategoryIndex = it },
                     onMangaClicked = { navigator.push(MangaScreen(it)) },
@@ -370,5 +389,59 @@ internal fun MangaLibraryTabContent(
     LaunchedEffect(Unit) {
         launch { queryEvent.receiveAsFlow().collect(screenModel::search) }
         launch { requestSettingsSheetEvent.receiveAsFlow().collectLatest { screenModel.showSettingsDialog() } }
+        launch {
+            screenModel.events.collectLatest { event ->
+                when (event) {
+                    is MangaLibraryScreenModel.Event.MarkedRead -> {
+                        val messageRes = if (event.read) {
+                            AYMR.plurals.library_marked_read
+                        } else {
+                            AYMR.plurals.library_marked_unread
+                        }
+                        val result = snackbarHostState.showSnackbar(
+                            message = context.pluralStringResource(
+                                messageRes,
+                                event.entries,
+                                event.entries,
+                            ),
+                            actionLabel = context.stringResource(MR.strings.action_undo),
+                        )
+                        if (result == SnackbarResult.ActionPerformed) screenModel.undoMarkRead(event.previous)
+                    }
+                    is MangaLibraryScreenModel.Event.Removed -> {
+                        var undone = false
+                        try {
+                            undone = snackbarHostState.showSnackbar(
+                                message = context.pluralStringResource(
+                                    AYMR.plurals.library_removed,
+                                    event.mangaList.size,
+                                    event.mangaList.size,
+                                ),
+                                actionLabel = context.stringResource(MR.strings.action_undo),
+                            ) == SnackbarResult.ActionPerformed
+                        } finally {
+                            if (undone) {
+                                screenModel.undoRemove(event.mangaList)
+                            } else {
+                                screenModel.finishRemove(event.mangaList)
+                            }
+                        }
+                    }
+                    is MangaLibraryScreenModel.Event.DownloadsQueued -> {
+                        snackbarHostState.showSnackbar(
+                            if (event.count > 0) {
+                                context.pluralStringResource(
+                                    AYMR.plurals.library_downloads_queued,
+                                    event.count,
+                                    event.count,
+                                )
+                            } else {
+                                context.stringResource(AYMR.strings.library_nothing_to_download)
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
