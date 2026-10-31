@@ -26,6 +26,8 @@ import dev.mihon.injekt.patchInjekt
 import eu.kanade.domain.DomainModule
 import eu.kanade.domain.SYDomainModule
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.source.interactor.GetKnownSourceLanguages
+import eu.kanade.domain.source.interactor.SetContentLanguage
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.setAppCompatDelegateThemeMode
 import eu.kanade.tachiyomi.crash.CrashActivity
@@ -132,6 +134,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
             Injekt.get<MangaDownloadManager>()
             Injekt.get<AnimeDownloadManager>()
+        }
+
+        // Languages that appear later on follow what was chosen as the content language
+        scope.launchIO {
+            val setContentLanguage = Injekt.get<SetContentLanguage>()
+            Injekt.get<GetKnownSourceLanguages>().subscribe()
+                .collect(setContentLanguage::reconcile)
         }
 
         scope.launchIO {

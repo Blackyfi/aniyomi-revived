@@ -29,6 +29,8 @@ import eu.kanade.domain.source.anime.interactor.GetLanguagesWithAnimeSources
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeIncognito
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeSource
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeSourcePin
+import eu.kanade.domain.source.interactor.GetKnownSourceLanguages
+import eu.kanade.domain.source.interactor.SetContentLanguage
 import eu.kanade.domain.source.interactor.SetMigrateSorting
 import eu.kanade.domain.source.interactor.ToggleLanguage
 import eu.kanade.domain.source.manga.interactor.GetEnabledMangaSources
@@ -370,6 +372,8 @@ class DomainModule : InjektModule {
         addFactory { GetMangaSourcesWithNonLibraryManga(get()) }
         addFactory { SetMigrateSorting(get()) }
         addFactory { ToggleLanguage(get()) }
+        addFactory { SetContentLanguage(get()) }
+        addFactory { GetKnownSourceLanguages(get(), get()) }
         addFactory { ToggleMangaSource(get()) }
         addFactory { ToggleMangaSourcePin(get()) }
         addFactory { TrustAnimeExtension(get(), get()) }
