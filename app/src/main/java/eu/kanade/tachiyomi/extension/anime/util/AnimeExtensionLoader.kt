@@ -15,13 +15,16 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.AnimeSourceFactory
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
+import eu.kanade.tachiyomi.extension.extensionInitDispatcher
 import eu.kanade.tachiyomi.util.lang.Hash
 import eu.kanade.tachiyomi.util.storage.copyAndSetReadOnlyTo
 import eu.kanade.tachiyomi.util.system.ChildFirstPathClassLoader
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
@@ -39,6 +42,7 @@ internal object AnimeExtensionLoader {
         preferences.showNsfwSource().get()
     }
 
+    private const val LOAD_PARALLELISM = 4
     private const val EXTENSION_FEATURE = "tachiyomi.animeextension"
     private const val METADATA_SOURCE_CLASS = "tachiyomi.animeextension.class"
     private const val METADATA_SOURCE_FACTORY = "tachiyomi.animeextension.factory"
@@ -169,10 +173,12 @@ internal object AnimeExtensionLoader {
 
         if (extPkgs.isEmpty()) return emptyList()
 
-        // Load each extension concurrently and wait for completion
+        // Load each extension concurrently and wait for completion. Most of the work is blocking
+        // class loading, so it needs threads of its own to actually run concurrently.
+        val dispatcher = Dispatchers.IO.limitedParallelism(LOAD_PARALLELISM)
         return runBlocking {
             val deferred = extPkgs.map {
-                async { loadExtension(context, it) }
+                async(dispatcher) { loadExtension(context, it) }
             }
             deferred.awaitAll()
         }
@@ -320,26 +326,30 @@ internal object AnimeExtensionLoader {
             }
             .flatMap {
                 try {
-                    when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
-                        is AnimeSource -> listOf(obj)
-                        is AnimeSourceFactory -> obj.createSources()
-                        else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                    withContext(extensionInitDispatcher) {
+                        when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
+                            is AnimeSource -> listOf(obj)
+                            is AnimeSourceFactory -> obj.createSources()
+                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                        }
                     }
                 } catch (e: LinkageError) {
                     try {
                         val fallBackClassLoader = PathClassLoader(appInfo.sourceDir, null, context.classLoader)
-                        when (
-                            val obj = Class.forName(
-                                it,
-                                false,
-                                fallBackClassLoader,
-                            ).getDeclaredConstructor().newInstance()
-                        ) {
-                            is AnimeSource -> {
-                                listOf(obj)
+                        withContext(extensionInitDispatcher) {
+                            when (
+                                val obj = Class.forName(
+                                    it,
+                                    false,
+                                    fallBackClassLoader,
+                                ).getDeclaredConstructor().newInstance()
+                            ) {
+                                is AnimeSource -> {
+                                    listOf(obj)
+                                }
+                                is AnimeSourceFactory -> obj.createSources()
+                                else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                             }
-                            is AnimeSourceFactory -> obj.createSources()
-                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                         }
                     } catch (e: Throwable) {
                         logcat(LogPriority.ERROR, e) { "Extension load error: $extName ($it)" }

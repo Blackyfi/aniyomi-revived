@@ -98,23 +98,16 @@ android {
 
             buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = false)}\"")
         }
-        create("benchmark") {
-            initWith(release)
+    }
 
-            isDebuggable = false
-            isProfileable = true
-            versionNameSuffix = "-benchmark"
-            applicationIdSuffix = ".benchmark"
-
-            signingConfig = debug.signingConfig
-
-            matchingFallbacks.addAll(commonMatchingFallbacks)
-        }
+    // The baseline profile plugin derives these from release, which isn't signed in the build
+    // script. They only exist to be installed on the device generating the profiles.
+    buildTypes.matching { it.name.startsWith("nonMinified") || it.name.startsWith("benchmark") }.configureEach {
+        signingConfig = signingConfigs.getByName("debug")
     }
 
     sourceSets {
         getByName("preview").res.srcDirs("src/debug/res")
-        getByName("benchmark").res.srcDirs("src/debug/res")
     }
 
     splits {
@@ -344,14 +337,6 @@ dependencies {
 }
 
 androidComponents {
-    beforeVariants { variantBuilder ->
-        // Disables standardBenchmark
-        if (variantBuilder.buildType == "benchmark") {
-            variantBuilder.enable = variantBuilder.productFlavors.containsAll(
-                listOf("default" to "dev"),
-            )
-        }
-    }
     onVariants(selector().withFlavor("default" to "standard")) {
         // Only excluding in standard flavor because this breaks
         // Layout Inspector's Compose tree

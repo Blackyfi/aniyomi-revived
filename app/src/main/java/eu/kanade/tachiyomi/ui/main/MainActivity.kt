@@ -99,6 +99,7 @@ import eu.kanade.tachiyomi.ui.player.ExternalIntents
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.isNavigationBarNeedsScrim
+import eu.kanade.tachiyomi.util.system.isProfilingBuildType
 import eu.kanade.tachiyomi.util.system.openInBrowser
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.system.updaterEnabled
@@ -140,6 +141,11 @@ class MainActivity : BaseActivity() {
 
     // To be checked by splash screen. If true then splash screen will be removed.
     var ready = false
+        set(value) {
+            field = value
+            // The content behind the splash screen has loaded: this is "time to full display"
+            if (value) reportFullyDrawn()
+        }
 
     // Migration runs off the main thread; the splash screen waits on this flag.
     private var migrationComplete = false
@@ -326,9 +332,7 @@ class MainActivity : BaseActivity() {
         val startTime = System.currentTimeMillis()
         splashScreen?.setKeepOnScreenCondition {
             val elapsed = System.currentTimeMillis() - startTime
-            elapsed <= SPLASH_MIN_DURATION ||
-                (!ready || !migrationComplete) &&
-                elapsed <= SPLASH_MAX_DURATION
+            (!ready || !migrationComplete) && elapsed <= SPLASH_MAX_DURATION
         }
         setSplashScreenExitAnimation(splashScreen)
 
@@ -418,6 +422,8 @@ class MainActivity : BaseActivity() {
         val navigator = LocalNavigator.currentOrThrow
 
         LaunchedEffect(Unit) {
+            // Profile generation and benchmarks start from a clean install and have to reach the app
+            if (isProfilingBuildType) return@LaunchedEffect
             if (!preferences.shownOnboardingFlow().get() && navigator.lastItem !is OnboardingScreen) {
                 navigator.push(OnboardingScreen())
             }
@@ -641,6 +647,5 @@ class MainActivity : BaseActivity() {
 }
 
 // Splash screen
-private const val SPLASH_MIN_DURATION = 500 // ms
 private const val SPLASH_MAX_DURATION = 5000 // ms
 private const val SPLASH_EXIT_ANIM_DURATION = 400L // ms

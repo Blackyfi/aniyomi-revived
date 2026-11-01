@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.ManagedVirtualDevice
+
 plugins {
     id("mihon.benchmark")
     alias(libs.plugins.androidx.baselineprofile)
@@ -8,22 +10,25 @@ android {
 
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        testInstrumentationRunnerArguments["androidx.benchmark.enabledRules"] = "BaselineProfile"
-    }
-
-    buildTypes {
-        // This benchmark buildType is used for benchmarking, and should function like your
-        // release build (for example, with minification on). It's signed with a debug key
-        // for easy local/CI testing.
-        create("benchmark") {
-            isDebuggable = true
-            signingConfig = getByName("debug").signingConfig
-            matchingFallbacks.add("release")
-        }
     }
 
     targetProjectPath = ":app"
     experimentalProperties["android.experimental.self-instrumenting"] = true
+
+    testOptions.managedDevices.devices {
+        create<ManagedVirtualDevice>("pixel6Api34") {
+            device = "Pixel 6"
+            apiLevel = 34
+            systemImageSource = "aosp"
+        }
+    }
+}
+
+// Run with: ./gradlew :app:generateBaselineProfile
+// The result lands in app/src/release/generated/baselineProfiles and has to be committed.
+baselineProfile {
+    managedDevices += "pixel6Api34"
+    useConnectedDevices = false
 }
 
 dependencies {
@@ -34,7 +39,11 @@ dependencies {
 }
 
 androidComponents {
-    beforeVariants(selector().all()) {
-        it.enable = it.buildType == "benchmark"
+    onVariants { variant ->
+        val artifactsLoader = variant.artifacts.getBuiltArtifactsLoader()
+        variant.instrumentationRunnerArguments.put(
+            "targetAppId",
+            variant.testedApks.map { artifactsLoader.load(it)?.applicationId },
+        )
     }
 }

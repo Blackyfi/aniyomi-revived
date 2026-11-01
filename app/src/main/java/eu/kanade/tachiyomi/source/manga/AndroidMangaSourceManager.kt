@@ -14,9 +14,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import tachiyomi.domain.source.manga.model.StubMangaSource
 import tachiyomi.domain.source.manga.repository.MangaStubSourceRepository
 import tachiyomi.domain.source.manga.service.MangaSourceManager
@@ -25,6 +28,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.seconds
 
 class AndroidMangaSourceManager(
     private val context: Context,
@@ -43,12 +47,15 @@ class AndroidMangaSourceManager(
 
     private val stubSourcesMap = ConcurrentHashMap<Long, StubMangaSource>()
 
-    override val catalogueSources: Flow<List<CatalogueSource>> = sourcesMapFlow.map {
-        it.values.filterIsInstance<CatalogueSource>()
-    }
+    override val catalogueSources: Flow<List<CatalogueSource>> = sourcesMapFlow
+        .onStart { _isInitialized.first { it } }
+        .map { it.values.filterIsInstance<CatalogueSource>() }
 
     init {
         scope.launch {
+            // Extensions are scanned off the main thread; until that's done an empty list here
+            // would mean "not known yet", not "none installed".
+            extensionManager.isInitialized.first { it }
             extensionManager.installedExtensionsFlow
                 .collectLatest { extensions ->
                     val mutableMap = ConcurrentHashMap<Long, MangaSource>(
@@ -81,19 +88,37 @@ class AndroidMangaSourceManager(
         }
     }
 
+    /**
+     * Sources are loaded in the background. Callers can't tell "not loaded yet" from "not
+     * installed", and would treat a source as missing, so lookups wait for the load to finish.
+     * The timeout only guards against a hung extension.
+     */
+    private fun awaitInitializedBlocking() {
+        if (_isInitialized.value) return
+        runBlocking { withTimeoutOrNull(INIT_WAIT_TIMEOUT) { _isInitialized.first { it } } }
+    }
+
     override fun get(sourceKey: Long): MangaSource? {
+        awaitInitializedBlocking()
         return sourcesMapFlow.value[sourceKey]
     }
 
     override fun getOrStub(sourceKey: Long): MangaSource {
+        awaitInitializedBlocking()
         return sourcesMapFlow.value[sourceKey] ?: stubSourcesMap.getOrPut(sourceKey) {
             runBlocking { createStubSource(sourceKey) }
         }
     }
 
-    override fun getOnlineSources() = sourcesMapFlow.value.values.filterIsInstance<HttpSource>()
+    override fun getOnlineSources(): List<HttpSource> {
+        awaitInitializedBlocking()
+        return sourcesMapFlow.value.values.filterIsInstance<HttpSource>()
+    }
 
-    override fun getCatalogueSources() = sourcesMapFlow.value.values.filterIsInstance<CatalogueSource>()
+    override fun getCatalogueSources(): List<CatalogueSource> {
+        awaitInitializedBlocking()
+        return sourcesMapFlow.value.values.filterIsInstance<CatalogueSource>()
+    }
 
     override fun getStubSources(): List<StubMangaSource> {
         val onlineSourceIds = getOnlineSources().map { it.id }
@@ -122,3 +147,5 @@ class AndroidMangaSourceManager(
         return StubMangaSource(id = id, lang = "", name = "")
     }
 }
+
+private val INIT_WAIT_TIMEOUT = 20.seconds
