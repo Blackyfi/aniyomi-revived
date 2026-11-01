@@ -190,6 +190,8 @@
     <string name="pref_player_custom_button_content">Lua code</string>
     <string name="pref_player_custom_button_content_long">Lua code (on long press)</string>
     <string name="pref_player_custom_button_optional">(optional)</string>
+    <string name="pref_player_custom_button_set_primary">Set as primary button</string>
+    <string name="pref_player_custom_button_unset_primary">Remove as primary button</string>
     <string name="pref_player_custom_button_delete">Delete button</string>
     <string name="pref_player_custom_button_delete_confirm">Do you wish to delete the button "%s"?</string>
     <string name="pref_player_custom_button_startup">On startup</string>

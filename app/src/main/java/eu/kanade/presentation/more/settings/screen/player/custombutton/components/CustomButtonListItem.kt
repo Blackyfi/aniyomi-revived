@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import tachiyomi.domain.custombuttons.model.CustomButton
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -67,7 +68,13 @@ fun ReorderableCollectionItemScope.CustomButtonListItem(
                 Icon(
                     imageVector = starImage,
                     tint = starColor,
-                    contentDescription = null,
+                    contentDescription = stringResource(
+                        if (isFavorite) {
+                            AYMR.strings.pref_player_custom_button_unset_primary
+                        } else {
+                            AYMR.strings.pref_player_custom_button_set_primary
+                        },
+                    ),
                 )
             }
             IconButton(onClick = onEdit) {
