@@ -58,10 +58,12 @@ fun BottomLeftPlayerControls(
         ControlsButton(
             Icons.Default.LockOpen,
             onClick = onLockControls,
+            title = stringResource(AYMR.strings.player_action_lock_controls),
         )
         ControlsButton(
             icon = Icons.Default.ScreenRotation,
             onClick = onCycleRotation,
+            title = stringResource(AYMR.strings.player_action_rotate),
         )
         ControlsButton(
             text = stringResource(AYMR.strings.player_speed, playbackSpeed),

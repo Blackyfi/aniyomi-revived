@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import eu.kanade.tachiyomi.ui.player.controls.CARDS_MAX_WIDTH
+import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
@@ -92,7 +93,10 @@ fun SubtitleSettingsPanel(
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismissRequest) {
-                            Icon(imageVector = Icons.AutoMirrored.Default.ArrowBack, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                                contentDescription = stringResource(AYMR.strings.player_action_back),
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors().copy(containerColor = Color.Transparent),
@@ -132,7 +136,10 @@ fun SubtitleSettingsPanel(
                         ),
                     )
                     IconButton(onDismissRequest) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = null)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(MR.strings.action_close),
+                        )
                     }
                 }
                 repeat(3) { cards(it, Modifier) }

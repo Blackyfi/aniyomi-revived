@@ -33,7 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.ui.player.controls.components.AutoPlaySwitch
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
+import tachiyomi.presentation.core.i18n.stringResource
 
 @Composable
 fun TopRightPlayerControls(
@@ -74,12 +76,14 @@ fun TopRightPlayerControls(
         ControlsButton(
             icon = Icons.Default.Subtitles,
             onClick = onSubtitlesClick,
+            title = stringResource(AYMR.strings.player_action_subtitles),
             onLongClick = onSubtitlesLongClick,
             horizontalSpacing = MaterialTheme.padding.mediumSmall,
         )
         ControlsButton(
             icon = Icons.Default.Audiotrack,
             onClick = onAudioClick,
+            title = stringResource(AYMR.strings.player_action_audio),
             onLongClick = onAudioLongClick,
             horizontalSpacing = MaterialTheme.padding.mediumSmall,
         )
@@ -87,6 +91,7 @@ fun TopRightPlayerControls(
             ControlsButton(
                 icon = Icons.Default.HighQuality,
                 onClick = onQualityClick,
+                title = stringResource(AYMR.strings.player_action_quality),
                 onLongClick = onQualityClick,
                 horizontalSpacing = MaterialTheme.padding.mediumSmall,
             )
@@ -94,6 +99,7 @@ fun TopRightPlayerControls(
         ControlsButton(
             icon = Icons.Default.MoreVert,
             onClick = onMoreClick,
+            title = stringResource(AYMR.strings.player_action_more),
             onLongClick = onMoreLongClick,
             horizontalSpacing = MaterialTheme.padding.mediumSmall,
         )

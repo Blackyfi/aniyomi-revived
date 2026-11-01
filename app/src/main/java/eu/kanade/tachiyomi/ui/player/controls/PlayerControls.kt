@@ -342,6 +342,7 @@ fun PlayerControls(
                     ControlsButton(
                         Icons.Filled.Lock,
                         onClick = { viewModel.unlockControls() },
+                        title = stringResource(AYMR.strings.player_action_unlock_controls),
                     )
                 }
                 AnimatedVisibility(
