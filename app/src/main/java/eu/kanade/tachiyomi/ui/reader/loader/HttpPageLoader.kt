@@ -17,6 +17,7 @@ import eu.kanade.tachiyomi.torrentServer.model.toLoadStatus
 import eu.kanade.tachiyomi.torrentutils.TorrentUtils
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.ExtensionErrorStorage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -26,12 +27,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import logcat.LogPriority
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
@@ -39,6 +40,7 @@ import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
@@ -53,16 +55,15 @@ internal class HttpPageLoader(
     // SY -->
     private val sourcePreferences: SourcePreferences = Injekt.get(),
     // SY <--
+    private val readerPreferences: ReaderPreferences = Injekt.get(),
 ) : PageLoader() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * A queue used to manage requests one by one while allowing priorities.
+     * A queue used to manage requests a few at a time while allowing priorities.
      */
     private val queue = PriorityBlockingQueue<PriorityPage>()
-
-    private val preloadSize = 4
 
     // SY -->
     private val dataSaver = DataSaver(source, sourcePreferences)
@@ -72,6 +73,10 @@ internal class HttpPageLoader(
     private var torrentDeadUntilMs = 0L
 
     private val torrentDownloads = Semaphore(MAX_TORRENT_DOWNLOADS)
+    private val sourceDownloads = Semaphore(MAX_SOURCE_DOWNLOADS)
+
+    /** The cache refuses a second writer, which a chapter repeating an image would otherwise be. */
+    private val imageLocks = ConcurrentHashMap<String, Mutex>()
 
     private var torrentKeepAliveJob: Job? = null
 
@@ -80,30 +85,34 @@ internal class HttpPageLoader(
 
     init {
         scope.launchIO {
-            flow {
-                while (true) {
-                    emit(runInterruptible { queue.take() }.page)
+            while (true) {
+                // Holding one of each until a page is picked means the pick happens when it can
+                // start, so that the page on screen overtakes the preloads queued behind it.
+                torrentDownloads.acquire()
+                sourceDownloads.acquire()
+                val page = runInterruptible { queue.take() }.page
+                if (page.status != Page.State.QUEUE) {
+                    torrentDownloads.release()
+                    sourceDownloads.release()
+                    continue
                 }
-            }
-                .filter { it.status == Page.State.QUEUE }
-                .collect { page ->
-                    // One page per source request keeps hosts happy, but a torrent is served from the
-                    // device, and one page stuck on a rare piece shouldn't hold up the one on screen.
-                    if (page.imageUrl?.let(TorrentServerUtils::streamHash) != null) {
-                        // Before the next take(), which would otherwise see this page still queued.
-                        page.status = Page.State.DOWNLOAD_IMAGE
-                        torrentDownloads.acquire()
-                        launchIO {
-                            try {
-                                internalLoadPage(page)
-                            } finally {
-                                torrentDownloads.release()
-                            }
-                        }
-                    } else {
+
+                // A torrent is served from the device, so hosts have no stake in it, and pages stuck on
+                // rare pieces shouldn't hold up others that have the pieces they need.
+                val isTorrent = page.imageUrl?.let(TorrentServerUtils::streamHash) != null
+                val slots = if (isTorrent) torrentDownloads else sourceDownloads
+                (if (isTorrent) sourceDownloads else torrentDownloads).release()
+
+                // Before the next take(), which would otherwise see this page still queued.
+                page.status = if (page.imageUrl.isNullOrEmpty()) Page.State.LOAD_PAGE else Page.State.DOWNLOAD_IMAGE
+                launchIO {
+                    try {
                         internalLoadPage(page)
+                    } finally {
+                        slots.release()
                     }
                 }
+            }
         }
     }
 
@@ -166,7 +175,7 @@ internal class HttpPageLoader(
         if (page.status == Page.State.QUEUE) {
             queuedPages += PriorityPage(page, 1).also { queue.offer(it) }
         }
-        queuedPages += preloadNextPages(page, preloadSize)
+        queuedPages += preloadNextPages(page, readerPreferences.preloadPages().get())
 
         suspendCancellableCoroutine<Nothing> { continuation ->
             continuation.invokeOnCancellation {
@@ -336,14 +345,16 @@ internal class HttpPageLoader(
             }
             val imageUrl = page.imageUrl!!
 
-            if (!chapterCache.isImageInCache(imageUrl)) {
-                page.status = Page.State.DOWNLOAD_IMAGE
-                val torrentHash = TorrentServerUtils.streamHash(imageUrl)
-                if (torrentHash != null) {
-                    downloadTorrentImage(page, imageUrl, torrentHash)
-                } else {
-                    val imageResponse = source.getImage(page, dataSaver)
-                    chapterCache.putImageToCache(imageUrl, imageResponse)
+            imageLocks.getOrPut(imageUrl) { Mutex() }.withLock {
+                if (!chapterCache.isImageInCache(imageUrl)) {
+                    page.status = Page.State.DOWNLOAD_IMAGE
+                    val torrentHash = TorrentServerUtils.streamHash(imageUrl)
+                    if (torrentHash != null) {
+                        downloadTorrentImage(page, imageUrl, torrentHash)
+                    } else {
+                        val imageResponse = source.getImage(page, dataSaver)
+                        chapterCache.putImageToCache(imageUrl, imageResponse)
+                    }
                 }
             }
 
@@ -364,6 +375,9 @@ internal class HttpPageLoader(
 }
 
 private const val MAX_TORRENT_DOWNLOADS = 3
+
+/** The same number the downloader runs against sources. */
+private const val MAX_SOURCE_DOWNLOADS = 2
 private const val TORRENT_KEEP_ALIVE_INTERVAL_MS = 60_000L
 private const val TORRENT_KEEP_ALIVE_MAX_IDLE_MS = 10 * 60_000L
 

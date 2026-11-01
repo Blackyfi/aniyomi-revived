@@ -49,6 +49,12 @@ object SettingsReaderScreen : SearchableSettings {
                 ),
                 title = stringResource(MR.strings.pref_double_tap_anim_speed),
             ),
+            Preference.PreferenceItem.ListPreference(
+                preference = readerPref.preloadPages(),
+                entries = listOf(2, 4, 6, 8, 12).associateWith { it.toString() }.toImmutableMap(),
+                title = stringResource(AYMR.strings.pref_reader_preload_pages),
+                subtitle = stringResource(AYMR.strings.pref_reader_preload_pages_summary),
+            ),
             Preference.PreferenceItem.SwitchPreference(
                 preference = readerPref.showReadingMode(),
                 title = stringResource(MR.strings.pref_show_reading_mode),
