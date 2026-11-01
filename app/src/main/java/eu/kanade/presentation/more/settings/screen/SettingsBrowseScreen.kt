@@ -12,7 +12,9 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.browse.AnimeExtensionReposScreen
+import eu.kanade.presentation.more.settings.screen.browse.ContentLanguageScreen
 import eu.kanade.presentation.more.settings.screen.browse.MangaExtensionReposScreen
+import eu.kanade.presentation.more.settings.screen.browse.contentLanguageSummary
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.authenticate
 import kotlinx.collections.immutable.persistentListOf
 import mihon.domain.extensionrepo.anime.interactor.GetAnimeExtensionRepoCount
@@ -47,6 +49,11 @@ object SettingsBrowseScreen : SearchableSettings {
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.label_sources),
                 preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(AYMR.strings.pref_content_language),
+                        subtitle = contentLanguageSummary(),
+                        onClick = { navigator.push(ContentLanguageScreen()) },
+                    ),
                     Preference.PreferenceItem.SwitchPreference(
                         preference = sourcePreferences.hideInAnimeLibraryItems(),
                         title = stringResource(AYMR.strings.pref_hide_in_anime_library_items),
