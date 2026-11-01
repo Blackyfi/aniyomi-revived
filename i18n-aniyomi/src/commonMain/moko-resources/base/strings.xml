@@ -649,6 +649,8 @@
     <string name="player_action_play">Play</string>
     <string name="player_action_pause">Pause</string>
     <string name="player_action_autoplay">Autoplay next episode</string>
+    <string name="pref_hosters_prepare_next">Prepare the next episode</string>
+    <string name="pref_hosters_prepare_next_summary">With autoplay on Wi-Fi, looks up the next episode\'s hosts in the last two minutes, so it starts sooner</string>
     <string name="torrent_error_server">The torrent server didn\'t start</string>
     <string name="torrent_error_no_peers">Nobody is sharing this torrent right now. It may be dead, try again later.</string>
     <!-- Server-side chapter progress indicators (sources that report it, e.g. MangaVault) -->

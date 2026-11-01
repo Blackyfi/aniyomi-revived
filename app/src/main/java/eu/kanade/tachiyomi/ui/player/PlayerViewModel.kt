@@ -27,6 +27,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.inputmethod.InputMethodManager
@@ -90,6 +91,7 @@ import eu.kanade.tachiyomi.util.lang.byteSize
 import eu.kanade.tachiyomi.util.lang.takeBytes
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
+import eu.kanade.tachiyomi.util.system.isConnectedToWifi
 import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.Utils
@@ -1362,6 +1364,11 @@ class PlayerViewModel @JvmOverloads constructor(
 
     private var getHosterVideoLinksJob: Job? = null
 
+    private var preparingEpisodeId = -1L
+
+    @Volatile
+    private var preparedHosters: PreparedHosters? = null
+
     fun cancelHosterVideoLinksJob() {
         getHosterVideoLinksJob?.cancel()
     }
@@ -1744,7 +1751,7 @@ class PlayerViewModel @JvmOverloads constructor(
                 val currentEpisode =
                     currentEpisode.value
                         ?: throw ExceptionWithStringResource("No episode loaded", AYMR.strings.no_episode_loaded)
-                currentHosterList = EpisodeLoader.getHosters(
+                currentHosterList = takePreparedHosters(currentEpisode.id!!) ?: EpisodeLoader.getHosters(
                     currentEpisode.toDomainEpisode()!!,
                     anime,
                     source,
@@ -1801,6 +1808,48 @@ class PlayerViewModel @JvmOverloads constructor(
         if (inDownloadRange) {
             downloadNextEpisodes()
         }
+
+        if (totalSeconds - seconds <= PREPARE_NEXT_EPISODE_WINDOW_MS) {
+            prepareNextEpisode()
+        }
+    }
+
+    /**
+     * Fetches the next episode's hosters ahead of autoplay, to have that much less to wait for when
+     * it starts. Once per episode, on Wi-Fi only since the user may yet stop here. Only the hoster
+     * list: video links are what tend to expire, and are still resolved when the episode starts.
+     */
+    private fun prepareNextEpisode() {
+        val nextEpisodeId = getAdjacentEpisodeId(previous = false)
+        if (nextEpisodeId == -1L || nextEpisodeId == preparingEpisodeId) return
+        if (!playerPreferences.autoplayEnabled().get() || !playerPreferences.prepareNextEpisode().get()) return
+        if (!activity.isConnectedToWifi()) return
+
+        val anime = currentAnime.value ?: return
+        val source = currentSource.value ?: return
+        val nextEpisode = currentPlaylist.value.firstOrNull { it.id == nextEpisodeId }?.toDomainEpisode() ?: return
+
+        preparingEpisodeId = nextEpisodeId
+        viewModelScope.launchIO {
+            try {
+                val hosters = EpisodeLoader.getHosters(nextEpisode, anime, source)
+                if (hosters.isNotEmpty()) {
+                    preparedHosters = PreparedHosters(nextEpisodeId, hosters, SystemClock.elapsedRealtime())
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // It's only a head start. The episode fetches them itself if it comes to that.
+                logcat(LogPriority.INFO, e) { "Couldn't prepare the next episode" }
+            }
+        }
+    }
+
+    private fun takePreparedHosters(episodeId: Long): List<Hoster>? {
+        val prepared = preparedHosters?.takeIf { it.episodeId == episodeId } ?: return null
+        preparedHosters = null
+        val age = SystemClock.elapsedRealtime() - prepared.preparedAtMs
+        return prepared.hosters.takeIf { age <= PREPARED_HOSTERS_MAX_AGE_MS }
     }
 
     private suspend fun updateEpisodeProgressOnComplete(currentEp: Episode) {
@@ -2319,6 +2368,10 @@ data class PlayerLoadingStatus(
     val torrent: TorrentLoadStatus?,
 )
 
+private class PreparedHosters(val episodeId: Long, val hosters: List<Hoster>, val preparedAtMs: Long)
+
 private const val HOSTER_GRACE_PERIOD_MS = 2_000L
+private const val PREPARE_NEXT_EPISODE_WINDOW_MS = 2 * 60_000L
+private const val PREPARED_HOSTERS_MAX_AGE_MS = 10 * 60_000L
 private const val TORRENT_STATUS_INTERVAL_MS = 1_500L
 private const val TORRENT_NETWORK_TIMEOUT_SECONDS = "180"
