@@ -741,12 +741,14 @@ class PlayerActivity : BaseActivity() {
                 }
             }
 
+            // Either one ending doesn't mean playback is back: a seek finishing while the cache is
+            // still filling used to drop the indicator for the rest of the stall.
             "paused-for-cache" -> {
-                viewModel.isLoading.update { value }
+                viewModel.isLoading.update { value || player.isSeeking == true }
             }
 
             "seeking" -> {
-                viewModel.isLoading.update { value }
+                viewModel.isLoading.update { value || player.isPausedForCache == true }
             }
 
             "eof-reached" -> {
@@ -781,7 +783,10 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         when (property) {
             "speed" -> viewModel.playbackSpeed.update { value.toFloat() }
-            "video-params/aspect" -> if (isPipSupportedAndEnabled) createPipParams()
+            // The params set when playback started couldn't know the aspect yet.
+            "video-params/aspect" -> if (isPipSupportedAndEnabled) {
+                runCatching { setPictureInPictureParams(createPipParams()) }
+            }
         }
     }
 
@@ -821,9 +826,11 @@ class PlayerActivity : BaseActivity() {
             ),
         )
         builder.setSourceRectHint(pipRect)
-        player.videoH?.let {
-            val height = it
-            val width = it * player.getVideoOutAspect()!!
+        val videoHeight = player.videoH
+        val videoAspect = player.getVideoOutAspect()
+        if (videoHeight != null && videoAspect != null) {
+            val height = videoHeight
+            val width = videoHeight * videoAspect
             val rational = Rational(height, width.toInt()).toFloat()
             if (rational in 0.42..2.38) builder.setAspectRatio(Rational(width.toInt(), height))
         }
