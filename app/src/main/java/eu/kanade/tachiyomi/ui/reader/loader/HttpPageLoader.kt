@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.loader
 
+import android.os.SystemClock
 import aniyomi.util.DataSaver
 import aniyomi.util.DataSaver.Companion.getImage
 import eu.kanade.domain.source.service.SourcePreferences
@@ -7,6 +8,10 @@ import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.database.models.manga.toDomainChapter
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
+import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
+import eu.kanade.tachiyomi.torrentServer.model.TorrentLoadStatus
+import eu.kanade.tachiyomi.torrentServer.model.toLoadStatus
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.util.ExtensionErrorStorage
@@ -15,8 +20,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
 import logcat.LogPriority
@@ -25,6 +33,7 @@ import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.io.IOException
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
@@ -53,6 +62,9 @@ internal class HttpPageLoader(
     // SY -->
     private val dataSaver = DataSaver(source, sourcePreferences)
     // SY <--
+
+    @Volatile
+    private var torrentDeadUntilMs = 0L
 
     init {
         scope.launchIO {
@@ -141,6 +153,7 @@ internal class HttpPageLoader(
      * Retries a page. This method is only called from user interaction on the viewer.
      */
     override fun retryPage(page: ReaderPage) {
+        torrentDeadUntilMs = 0L
         if (page.status == Page.State.READY) {
             // The page downloaded but failed to decode. The queue skips READY pages, so without
             // this the retry button does nothing and the bad file stays cached.
@@ -203,6 +216,58 @@ internal class HttpPageLoader(
     }
 
     /**
+     * Downloads an image served by the local torrent server, riding out the wait for peers and
+     * publishing the torrent's state on the page in the meantime.
+     */
+    private suspend fun downloadTorrentImage(page: ReaderPage, imageUrl: String, hash: String) = coroutineScope {
+        page.torrentStatus.value = null
+        if (SystemClock.elapsedRealtime() < torrentDeadUntilMs) {
+            page.torrentStatus.value = TorrentLoadStatus(dead = true)
+            throw IOException("The torrent has no peers")
+        }
+
+        val policy = TorrentRetryPolicy(SystemClock.elapsedRealtime())
+        val statusJob = launch { publishTorrentStatus(page, hash, policy) }
+        try {
+            while (true) {
+                try {
+                    // Not through the data saver: those proxies fetch the URL themselves, and this
+                    // one only exists on the device.
+                    chapterCache.putImageToCache(imageUrl, source.getImage(page))
+                    page.torrentStatus.value = null
+                    return@coroutineScope
+                } catch (e: IOException) {
+                    if (!policy.shouldRetry(e, SystemClock.elapsedRealtime())) throw e
+                    logcat(LogPriority.INFO) { "[Torrent] page ${page.number} still waiting: ${e.message}" }
+                    delay(TORRENT_RETRY_DELAY_MS)
+                }
+            }
+        } catch (e: Exception) {
+            if (e !is CancellationException && policy.looksDead(SystemClock.elapsedRealtime())) {
+                torrentDeadUntilMs = SystemClock.elapsedRealtime() + TORRENT_DEAD_WINDOW_MS
+                page.torrentStatus.value = TorrentLoadStatus(dead = true)
+            }
+            throw e
+        } finally {
+            statusJob.cancel()
+        }
+    }
+
+    private suspend fun publishTorrentStatus(page: ReaderPage, hash: String, policy: TorrentRetryPolicy) {
+        delay(TORRENT_STATUS_FIRST_DELAY_MS)
+        page.torrentStatus.value = TorrentLoadStatus()
+        while (true) {
+            // Fails while the server is restarting or hasn't been handed the torrent yet.
+            runCatching { runInterruptible { TorrentServerApi.getTorrent(hash) } }.getOrNull()?.let { torrent ->
+                val status = torrent.toLoadStatus()
+                if (status.activePeers > 0) policy.sawPeers = true
+                page.torrentStatus.value = status
+            }
+            delay(TORRENT_STATUS_INTERVAL_MS)
+        }
+    }
+
+    /**
      * Loads the page, retrieving the image URL and downloading the image if necessary.
      * Downloaded images are stored in the chapter cache.
      *
@@ -218,8 +283,13 @@ internal class HttpPageLoader(
 
             if (!chapterCache.isImageInCache(imageUrl)) {
                 page.status = Page.State.DOWNLOAD_IMAGE
-                val imageResponse = source.getImage(page, dataSaver)
-                chapterCache.putImageToCache(imageUrl, imageResponse)
+                val torrentHash = TorrentServerUtils.streamHash(imageUrl)
+                if (torrentHash != null) {
+                    downloadTorrentImage(page, imageUrl, torrentHash)
+                } else {
+                    val imageResponse = source.getImage(page, dataSaver)
+                    chapterCache.putImageToCache(imageUrl, imageResponse)
+                }
             }
 
             page.stream = { chapterCache.getImageFile(imageUrl).inputStream() }
@@ -237,6 +307,14 @@ internal class HttpPageLoader(
         }
     }
 }
+
+/** Delay before the first status, so that a page the server already has doesn't flash one. */
+private const val TORRENT_STATUS_FIRST_DELAY_MS = 1_000L
+private const val TORRENT_STATUS_INTERVAL_MS = 1_500L
+private const val TORRENT_RETRY_DELAY_MS = 1_000L
+
+/** How long pages of a torrent found dead fail at once, rather than each waiting it out again. */
+private const val TORRENT_DEAD_WINDOW_MS = 30_000L
 
 /**
  * Data class used to keep ordering of pages in order to maintain priority.

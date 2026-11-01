@@ -625,6 +625,11 @@
     <string name="channel_torrent_server">Torrent server</string>
     <string name="torrent_server_is_running">Torrent server is running</string>
     <string name="action_stop_torrent_server">Stop</string>
+    <string name="torrent_status_connecting">Connecting to the torrent…</string>
+    <string name="torrent_status_peers_found">Connecting to peers (%1$d found)…</string>
+    <string name="torrent_status_waiting">Peers: %1$d, waiting for data…</string>
+    <string name="torrent_status_downloading">Peers: %1$d · %2$s/s</string>
+    <string name="torrent_error_no_peers">Nobody is sharing this torrent right now. It may be dead, try again later.</string>
     <!-- Server-side chapter progress indicators (sources that report it, e.g. MangaVault) -->
     <string name="server_chapter_downloaded">Pages stored on the server</string>
     <string name="server_chapter_not_downloaded">Pages not stored on the server yet</string>
