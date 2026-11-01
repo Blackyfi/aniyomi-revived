@@ -64,4 +64,28 @@
         <item quantity="one">%d entry wasn\'t checked</item>
         <item quantity="other">%d entries weren\'t checked</item>
     </plurals>
+    <plurals name="library_marked_read">
+        <item quantity="one">%d entry marked as read</item>
+        <item quantity="other">%d entries marked as read</item>
+    </plurals>
+    <plurals name="library_marked_unread">
+        <item quantity="one">%d entry marked as unread</item>
+        <item quantity="other">%d entries marked as unread</item>
+    </plurals>
+    <plurals name="library_marked_seen">
+        <item quantity="one">%d entry marked as seen</item>
+        <item quantity="other">%d entries marked as seen</item>
+    </plurals>
+    <plurals name="library_marked_unseen">
+        <item quantity="one">%d entry marked as unseen</item>
+        <item quantity="other">%d entries marked as unseen</item>
+    </plurals>
+    <plurals name="library_removed">
+        <item quantity="one">%d entry removed from your library</item>
+        <item quantity="other">%d entries removed from your library</item>
+    </plurals>
+    <plurals name="library_downloads_queued">
+        <item quantity="one">%d download added to the queue</item>
+        <item quantity="other">%d downloads added to the queue</item>
+    </plurals>
 </resources>

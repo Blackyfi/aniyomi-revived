@@ -37,7 +37,7 @@ class DeleteMangaCategory(
 
         val categoryPreferences = listOf(
             libraryPreferences.mangaUpdateCategories(),
-            libraryPreferences.mangaUpdateCategories(),
+            libraryPreferences.mangaUpdateCategoriesExclude(),
             downloadPreferences.removeExcludeCategories(),
             downloadPreferences.downloadNewChapterCategories(),
             downloadPreferences.downloadNewChapterCategoriesExclude(),
