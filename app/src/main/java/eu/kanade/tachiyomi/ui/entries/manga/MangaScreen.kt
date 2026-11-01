@@ -28,6 +28,7 @@ import eu.kanade.core.util.ifMangaSourcesLoaded
 import eu.kanade.domain.entries.manga.model.hasCustomCover
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
+import eu.kanade.presentation.components.EntryDetailsSkeleton
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
 import eu.kanade.presentation.entries.EditCoverAction
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
@@ -82,7 +83,7 @@ class MangaScreen(
     @Composable
     override fun Content() {
         if (!ifMangaSourcesLoaded()) {
-            LoadingScreen()
+            EntryDetailsSkeleton()
             return
         }
 
@@ -97,7 +98,7 @@ class MangaScreen(
         val state by screenModel.state.collectAsStateWithLifecycle()
 
         if (state is MangaScreenModel.State.Loading) {
-            LoadingScreen()
+            EntryDetailsSkeleton()
             return
         }
 
