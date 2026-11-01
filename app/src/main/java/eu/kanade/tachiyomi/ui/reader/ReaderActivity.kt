@@ -45,6 +45,8 @@ import com.hippo.unifile.UniFile
 import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.core.util.ifMangaSourcesLoaded
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.presentation.components.LoadFailureAction
+import eu.kanade.presentation.components.LoadFailureOverlay
 import eu.kanade.presentation.reader.DisplayRefreshHost
 import eu.kanade.presentation.reader.OrientationSelectDialog
 import eu.kanade.presentation.reader.PageIndicatorText
@@ -96,6 +98,7 @@ import tachiyomi.core.common.util.lang.launchNonCancellable
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -386,6 +389,24 @@ class ReaderActivity : BaseActivity() {
                 colorBlendMode = colorOverlayBlendMode,
             )
 
+            state.initialLoadError?.let { message ->
+                val chapterUrl = remember(message) { viewModel.getInitialChapterUrl() }
+                LoadFailureOverlay(
+                    message = message,
+                    actions = buildList {
+                        add(LoadFailureAction(stringResource(MR.strings.action_retry), ::retryInitialLoad))
+                        chapterUrl?.let { url ->
+                            add(
+                                LoadFailureAction(stringResource(MR.strings.action_open_in_web_view)) {
+                                    openInitialChapterInWebView(url)
+                                },
+                            )
+                        }
+                        add(LoadFailureAction(stringResource(MR.strings.action_close), ::finish))
+                    },
+                )
+            }
+
             ReaderAppBars(
                 visible = state.menuVisible,
                 fullscreen = isFullscreen,
@@ -623,13 +644,31 @@ class ReaderActivity : BaseActivity() {
     }
 
     /**
-     * Called from the presenter if the initial load couldn't load the pages of the chapter. In
-     * this case the activity is closed and a toast is shown to the user.
+     * Called from the presenter if the initial load couldn't load the pages of the chapter. The user
+     * gets the cause and a way to retry, unless there's no manga to retry, which closes the activity.
      */
     private fun setInitialChapterError(error: Throwable) {
         logcat(LogPriority.ERROR, error)
-        finish()
-        toast(error.message)
+        if (viewModel.manga == null) {
+            finish()
+            toast(error.message)
+        } else {
+            viewModel.showInitialLoadError(error.message ?: error.javaClass.simpleName)
+        }
+    }
+
+    private fun retryInitialLoad() {
+        lifecycleScope.launchNonCancellable {
+            viewModel.retryInit().exceptionOrNull()?.let { error ->
+                withUIContext { setInitialChapterError(error) }
+            }
+        }
+    }
+
+    private fun openInitialChapterInWebView(url: String) {
+        val manga = viewModel.manga ?: return
+        val source = viewModel.getSource() ?: return
+        startActivity(WebViewActivity.newIntent(this, url, source.id, manga.title))
     }
 
     /**
