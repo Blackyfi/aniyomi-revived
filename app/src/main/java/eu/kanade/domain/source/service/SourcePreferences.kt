@@ -25,6 +25,9 @@ class SourcePreferences(
         LocaleHelper.getDefaultEnabledLanguages(),
     )
 
+    /** See [eu.kanade.domain.source.ContentLanguages]. [enabledLanguages] remains the actual filter. */
+    fun contentLanguageSelection() = preferenceStore.getStringSet("content_language_selection", emptySet())
+
     fun showNsfwSource() = preferenceStore.getBoolean("show_nsfw_source", true)
 
     fun migrationSortingMode() = preferenceStore.getEnum(
