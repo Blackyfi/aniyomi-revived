@@ -57,7 +57,8 @@ abstract class SourcePagingSource(
                     .takeIf { it.mangas.isNotEmpty() }
                     ?: throw NoChaptersException()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable: an extension built against other APIs fails with a LinkageError.
             return LoadResult.Error(e)
         }
 
