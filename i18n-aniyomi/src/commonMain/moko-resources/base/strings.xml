@@ -676,4 +676,8 @@
     <string name="notification_update_skipped_text">Left out by your Smart update settings. Tap to see which and why</string>
     <string name="library_update_skipped_help">These entries were not checked for new chapters or episodes because of your choices under Settings → Library → Global update → Smart update. Each heading is the reason; change those settings to include them.</string>
     <string name="track_login_failed">Couldn't log in to the tracker. Check your connection and try again from Settings → Tracking.</string>
+    <string name="library_nothing_to_download">Nothing new to download</string>
+    <string name="library_downloaded_only_empty">Nothing downloaded here. Downloaded only is hiding the rest of your library.</string>
+    <string name="action_show_all_entries">Show everything</string>
+    <string name="action_reset_filters">Reset filters</string>
 </resources>

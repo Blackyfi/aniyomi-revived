@@ -36,6 +36,9 @@ fun MangaLibraryContent(
     contentPadding: PaddingValues,
     currentPage: () -> Int,
     hasActiveFilters: Boolean,
+    downloadedOnly: Boolean,
+    onResetFilters: () -> Unit,
+    onShowAllEntries: () -> Unit,
     showPageTabs: Boolean,
     onChangeCurrentPage: (Int) -> Unit,
     onMangaClicked: (Long) -> Unit,
@@ -90,7 +93,7 @@ fun MangaLibraryContent(
         PullRefresh(
             refreshing = isRefreshing,
             onRefresh = {
-                val started = onRefresh(categories[currentPage()])
+                val started = onRefresh(categories.getOrNull(currentPage()))
                 if (!started) return@PullRefresh
                 scope.launch {
                     // Fake refresh status but hide it after a second as it's a long running task
@@ -105,6 +108,9 @@ fun MangaLibraryContent(
                 state = pagerState,
                 contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
                 hasActiveFilters = hasActiveFilters,
+                downloadedOnly = downloadedOnly,
+                onResetFilters = onResetFilters,
+                onShowAllEntries = onShowAllEntries,
                 selectedIds = selectedIds,
                 searchQuery = searchQuery,
                 onGlobalSearchClicked = onGlobalSearchClicked,

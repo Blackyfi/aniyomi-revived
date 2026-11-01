@@ -386,7 +386,8 @@ class AnimeScreenModel(
 
                 // Finally match with enhanced tracking when available
                 addTracks.bindEnhancedTrackers(anime, state.source)
-                if (autoOpenTrack) {
+                // With a category picker open, the track sheet follows when the picker closes.
+                if (autoOpenTrack && !isFromChangeCategory) {
                     showTrackDialog()
                 }
             }
@@ -1143,6 +1144,13 @@ class AnimeScreenModel(
 
         screenModelScope.launchNonCancellable {
             setAnimeEpisodeFlags.awaitShowEpisodeSummaries(anime, flag)
+        }
+    }
+
+    fun resetToDefaultSettings() {
+        val anime = successState?.anime ?: return
+        screenModelScope.launchNonCancellable {
+            setAnimeDefaultEpisodeFlags.await(anime)
         }
     }
 

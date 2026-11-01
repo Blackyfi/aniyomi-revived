@@ -146,7 +146,7 @@ fun Screen.animeHistoryTab(
                         onClickSeasons = {
                             navigator.push(MigrateSeasonSelectScreen(dialog.oldAnime, dialog.newAnime))
                         },
-                        onPopScreen = { navigator.replace(AnimeScreen(dialog.oldAnime.id)) },
+                        onPopScreen = { navigator.push(AnimeScreen(dialog.newAnime.id)) },
                     )
                 }
                 null -> {}
