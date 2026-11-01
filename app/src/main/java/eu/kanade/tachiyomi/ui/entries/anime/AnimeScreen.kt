@@ -283,6 +283,7 @@ class AnimeScreen(
                 onShowPreviewsEnabled = screenModel::showEpisodePreviews,
                 onShowSummariesEnabled = screenModel::showEpisodeSummaries,
                 onSetAsDefault = screenModel::setCurrentSettingsAsDefault,
+                onResetToDefault = screenModel::resetToDefaultSettings,
             )
             AnimeScreenModel.Dialog.SeasonSettingsSheet -> SeasonSettingsDialog(
                 onDismissRequest = onDismissRequest,

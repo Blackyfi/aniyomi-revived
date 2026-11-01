@@ -1147,6 +1147,13 @@ class AnimeScreenModel(
         }
     }
 
+    fun resetToDefaultSettings() {
+        val anime = successState?.anime ?: return
+        screenModelScope.launchNonCancellable {
+            setAnimeDefaultEpisodeFlags.await(anime)
+        }
+    }
+
     fun setCurrentSettingsAsDefault(applyToExisting: Boolean) {
         val anime = successState?.anime ?: return
         screenModelScope.launchNonCancellable {
