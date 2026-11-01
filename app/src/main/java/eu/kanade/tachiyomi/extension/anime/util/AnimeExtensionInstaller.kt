@@ -22,11 +22,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.transformWhile
 import logcat.LogPriority
+import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.Injekt
@@ -79,18 +81,25 @@ internal class AnimeExtensionInstaller(private val context: Context) {
         // Register the receiver after removing (and unregistering) the previous download
         downloadReceiver.register()
 
-        val downloadUri = url.toUri()
-        val request = DownloadManager.Request(downloadUri)
-            .setTitle(extension.name)
-            .setMimeType(APK_MIME)
-            .setDestinationInExternalFilesDir(
-                context,
-                Environment.DIRECTORY_DOWNLOADS,
-                downloadUri.lastPathSegment,
-            )
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        val id = try {
+            val downloadUri = url.toUri()
+            val request = DownloadManager.Request(downloadUri)
+                .setTitle(extension.name)
+                .setMimeType(APK_MIME)
+                .setDestinationInExternalFilesDir(
+                    context,
+                    Environment.DIRECTORY_DOWNLOADS,
+                    downloadUri.lastPathSegment,
+                )
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
 
-        val id = downloadManager.enqueue(request)
+            downloadManager.enqueue(request)
+        } catch (e: Exception) {
+            // The URL comes from a repo's index, and the user can disable the system download manager.
+            logcat(LogPriority.ERROR, e) { "Couldn't start the download of $pkgName" }
+            if (activeDownloads.isEmpty()) downloadReceiver.unregister()
+            return flowOf(InstallStep.Error)
+        }
         activeDownloads[pkgName] = id
 
         val downloadStateFlow = MutableStateFlow(InstallStep.Pending)
@@ -168,39 +177,49 @@ internal class AnimeExtensionInstaller(private val context: Context) {
                 context.startActivity(intent)
             }
             BasePreferences.ExtensionInstaller.PRIVATE -> {
-                val extensionManager = Injekt.get<AnimeExtensionManager>()
-                val tempFile = File(context.cacheDir, "temp_$downloadId")
-
-                if (tempFile.exists() && !tempFile.delete()) {
-                    // Unlikely but just in case
-                    extensionManager.updateInstallStep(downloadId, InstallStep.Error)
-                    return
+                // Called from a broadcast receiver on the main thread; this copies and parses an APK.
+                launchIO {
+                    val step = installPrivateExtension(downloadId, uri)
+                    withUIContext { Injekt.get<AnimeExtensionManager>().updateInstallStep(downloadId, step) }
                 }
-
-                try {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-
-                    if (AnimeExtensionLoader.installPrivateExtensionFile(context, tempFile)) {
-                        extensionManager.updateInstallStep(downloadId, InstallStep.Installed)
-                    } else {
-                        extensionManager.updateInstallStep(downloadId, InstallStep.Error)
-                    }
-                } catch (e: Exception) {
-                    logcat(LogPriority.ERROR, e) { "Failed to read downloaded extension file." }
-                    extensionManager.updateInstallStep(downloadId, InstallStep.Error)
-                }
-
-                tempFile.delete()
             }
             else -> {
                 val intent =
                     AnimeExtensionInstallService.getIntent(context, downloadId, uri, installer)
-                ContextCompat.startForegroundService(context, intent)
+                try {
+                    ContextCompat.startForegroundService(context, intent)
+                } catch (e: IllegalStateException) {
+                    // The download can finish after the user has left the app, and Android 12+
+                    // doesn't allow starting a foreground service from the background.
+                    logcat(LogPriority.WARN, e) { "Couldn't start the extension installer" }
+                    updateInstallStep(downloadId, InstallStep.Error)
+                }
             }
+        }
+    }
+
+    private fun installPrivateExtension(downloadId: Long, uri: Uri): InstallStep {
+        val tempFile = File(context.cacheDir, "temp_$downloadId")
+        return try {
+            if (tempFile.exists() && !tempFile.delete()) {
+                // Unlikely but just in case
+                return InstallStep.Error
+            }
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            if (AnimeExtensionLoader.installPrivateExtensionFile(context, tempFile)) {
+                InstallStep.Installed
+            } else {
+                InstallStep.Error
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e) { "Failed to read downloaded extension file." }
+            InstallStep.Error
+        } finally {
+            tempFile.delete()
         }
     }
 
