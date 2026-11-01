@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Semaphore
 import logcat.LogPriority
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
@@ -66,6 +67,8 @@ internal class HttpPageLoader(
     @Volatile
     private var torrentDeadUntilMs = 0L
 
+    private val torrentDownloads = Semaphore(MAX_TORRENT_DOWNLOADS)
+
     init {
         scope.launchIO {
             flow {
@@ -74,7 +77,24 @@ internal class HttpPageLoader(
                 }
             }
                 .filter { it.status == Page.State.QUEUE }
-                .collect(::internalLoadPage)
+                .collect { page ->
+                    // One page per source request keeps hosts happy, but a torrent is served from the
+                    // device, and one page stuck on a rare piece shouldn't hold up the one on screen.
+                    if (page.imageUrl?.let(TorrentServerUtils::streamHash) != null) {
+                        // Before the next take(), which would otherwise see this page still queued.
+                        page.status = Page.State.DOWNLOAD_IMAGE
+                        torrentDownloads.acquire()
+                        launchIO {
+                            try {
+                                internalLoadPage(page)
+                            } finally {
+                                torrentDownloads.release()
+                            }
+                        }
+                    } else {
+                        internalLoadPage(page)
+                    }
+                }
         }
     }
 
@@ -307,6 +327,8 @@ internal class HttpPageLoader(
         }
     }
 }
+
+private const val MAX_TORRENT_DOWNLOADS = 3
 
 /** Delay before the first status, so that a page the server already has doesn't flash one. */
 private const val TORRENT_STATUS_FIRST_DELAY_MS = 1_000L
