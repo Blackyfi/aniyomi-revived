@@ -334,7 +334,8 @@ class AnimeUpdatesScreenModel(
                         }
 
                         range.forEach {
-                            val inbetweenItem = get(it)
+                            // The list may have shrunk since the anchor was selected
+                            val inbetweenItem = getOrNull(it) ?: return@forEach
                             if (!inbetweenItem.selected) {
                                 selectedEpisodeIds.add(inbetweenItem.update.episodeId)
                                 set(it, inbetweenItem.copy(selected = true))
@@ -380,10 +381,10 @@ class AnimeUpdatesScreenModel(
                 selectedEpisodeIds.addOrRemove(it.update.episodeId, !it.selected)
                 it.copy(selected = !it.selected)
             }
+            selectedPositions[0] = newItems.indexOfFirst { it.selected }
+            selectedPositions[1] = newItems.indexOfLast { it.selected }
             state.copy(items = newItems.toPersistentList())
         }
-        selectedPositions[0] = -1
-        selectedPositions[1] = -1
     }
 
     fun setDialog(dialog: Dialog?) {
