@@ -94,6 +94,7 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -112,6 +113,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withTimeoutOrNull
 import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
@@ -1376,11 +1379,18 @@ class PlayerViewModel @JvmOverloads constructor(
 
             try {
                 coroutineScope {
-                    hosterList.mapIndexed { hosterIdx, hoster ->
+                    val firstUsableHoster = CompletableDeferred<Unit>()
+                    val startOnFirstHoster = hosterIndex == -1 && playerPreferences.startOnFirstHoster().get()
+
+                    val hosterJobs = hosterList.mapIndexed { hosterIdx, hoster ->
                         async {
                             val hosterState = EpisodeLoader.loadHosterVideos(source, hoster)
 
                             _hosterState.updateAt(hosterIdx, hosterState)
+
+                            if (HosterLoader.selectBestVideo(_hosterState.value).first != -1) {
+                                firstUsableHoster.complete(Unit)
+                            }
 
                             if (hosterState is HosterState.Ready) {
                                 if (hosterIdx == hosterIndex) {
@@ -1412,7 +1422,30 @@ class PlayerViewModel @JvmOverloads constructor(
                                 }
                             }
                         }
-                    }.awaitAll()
+                    }
+                    val allHosters = launch { hosterJobs.awaitAll() }
+
+                    if (startOnFirstHoster) {
+                        select {
+                            firstUsableHoster.onAwait {}
+                            allHosters.onJoin {}
+                        }
+                        // A moment for the other hosters, as the list is ordered by what the source
+                        // thinks is best. Whatever turns up afterwards stays available in the sheet.
+                        withTimeoutOrNull(HOSTER_GRACE_PERIOD_MS) { allHosters.join() }
+
+                        val nothingChosenYet = selectedHosterVideoIndex.value == Pair(-1, -1)
+                        val hasUsableHoster = HosterLoader.selectBestVideo(hosterState.value).first != -1
+                        if (nothingChosenYet && hasUsableHoster && hasFoundPreferredVideo.compareAndSet(false, true)) {
+                            val (hosterIdx, videoIdx) = HosterLoader.selectBestVideo(hosterState.value)
+                            val video = (hosterState.value[hosterIdx] as HosterState.Ready).videoList[videoIdx]
+                            if (!loadVideo(source, video, hosterIdx, videoIdx)) {
+                                // Failed while others were still loading. Choose again when they're done.
+                                hasFoundPreferredVideo.set(false)
+                            }
+                        }
+                    }
+                    allHosters.join()
 
                     if (hasFoundPreferredVideo.compareAndSet(false, true)) {
                         val (hosterIdx, videoIdx) = HosterLoader.selectBestVideo(hosterState.value)
@@ -2256,5 +2289,6 @@ data class PlayerLoadingStatus(
     val torrent: TorrentLoadStatus?,
 )
 
+private const val HOSTER_GRACE_PERIOD_MS = 2_000L
 private const val TORRENT_STATUS_INTERVAL_MS = 1_500L
 private const val TORRENT_NETWORK_TIMEOUT_SECONDS = "180"

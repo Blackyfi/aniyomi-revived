@@ -30,6 +30,7 @@ class PlayerPreferences(
 
     // Hoster
 
+    fun startOnFirstHoster() = preferenceStore.getBoolean("pref_start_on_first_hoster", true)
     fun showFailedHosters() = preferenceStore.getBoolean("pref_show_failed_hosters", false)
     fun showEmptyHosters() = preferenceStore.getBoolean("pref_show_empty_hosters", false)
 
