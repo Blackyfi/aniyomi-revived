@@ -38,6 +38,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
@@ -50,6 +51,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import logcat.LogPriority
@@ -70,7 +72,9 @@ import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.entries.manga.model.MangaUpdate
 import tachiyomi.domain.history.manga.interactor.GetNextChapters
 import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
+import tachiyomi.domain.items.chapter.interactor.UpdateChapter
 import tachiyomi.domain.items.chapter.model.Chapter
+import tachiyomi.domain.items.chapter.model.ChapterUpdate
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.domain.library.manga.model.MangaLibrarySort
 import tachiyomi.domain.library.manga.model.sort
@@ -96,6 +100,7 @@ open class MangaLibraryScreenModel(
     private val getNextChapters: GetNextChapters = Injekt.get(),
     private val getChaptersByMangaId: GetChaptersByMangaId = Injekt.get(),
     private val setReadStatus: SetReadStatus = Injekt.get(),
+    private val updateChapter: UpdateChapter = Injekt.get(),
     private val updateManga: UpdateManga = Injekt.get(),
     private val setMangaCategories: SetMangaCategories = Injekt.get(),
     private val preferences: BasePreferences = Injekt.get(),
@@ -107,6 +112,9 @@ open class MangaLibraryScreenModel(
     private val trackerManager: TrackerManager = Injekt.get(),
     private val libraryType: MangaType = MangaType.MANGA,
 ) : StateScreenModel<MangaLibraryScreenModel.State>(State()) {
+
+    private val _events = Channel<Event>(Channel.UNLIMITED)
+    val events = _events.receiveAsFlow()
 
     // Each tab remembers its own active category; sharing one index would make switching
     // Manga <-> Manhwa jump both tabs to whichever category was used last.
@@ -184,6 +192,12 @@ open class MangaLibraryScreenModel(
                 mutableState.update { state ->
                     state.copy(hasActiveFilters = it)
                 }
+            }
+            .launchIn(screenModelScope)
+
+        preferences.downloadedOnly().changes()
+            .onEach { downloadedOnly ->
+                mutableState.update { it.copy(downloadedOnly = downloadedOnly) }
             }
             .launchIn(screenModelScope)
     }
@@ -559,6 +573,7 @@ open class MangaLibraryScreenModel(
      */
     private fun downloadUnreadChapters(mangas: List<Manga>, amount: Int?) {
         screenModelScope.launchNonCancellable {
+            var queued = 0
             mangas.forEach { manga ->
                 val chapters = getNextChapters.await(manga.id)
                     .fastFilterNot { chapter ->
@@ -573,7 +588,9 @@ open class MangaLibraryScreenModel(
                     .let { if (amount != null) it.take(amount) else it }
 
                 downloadManager.downloadChapters(manga, chapters)
+                queued += chapters.size
             }
+            _events.trySend(Event.DownloadsQueued(queued))
         }
     }
 
@@ -583,14 +600,23 @@ open class MangaLibraryScreenModel(
     fun markReadSelection(read: Boolean) {
         val mangas = state.value.selection.toList()
         screenModelScope.launchNonCancellable {
+            val previous = mangas
+                .flatMap { getChaptersByMangaId.await(it.manga.id) }
+                .filter { if (read) !it.read else it.read || it.lastPageRead > 0 }
+                .map { ChapterUpdate(id = it.id, read = it.read, lastPageRead = it.lastPageRead) }
             mangas.forEach { manga ->
                 setReadStatus.await(
                     manga = manga.manga,
                     read = read,
                 )
             }
+            if (previous.isNotEmpty()) _events.trySend(Event.MarkedRead(read, mangas.size, previous))
         }
         clearSelection()
+    }
+
+    fun undoMarkRead(previous: List<ChapterUpdate>) {
+        screenModelScope.launchNonCancellable { updateChapter.awaitAll(previous) }
     }
 
     /**
@@ -605,14 +631,7 @@ open class MangaLibraryScreenModel(
             val mangaToDelete = mangaList.distinctBy { it.id }
 
             if (deleteFromLibrary) {
-                val toDelete = mangaToDelete.map {
-                    it.removeCovers(coverCache)
-                    MangaUpdate(
-                        favorite = false,
-                        id = it.id,
-                    )
-                }
-                updateManga.awaitAll(toDelete)
+                updateManga.awaitAll(mangaToDelete.map { MangaUpdate(favorite = false, id = it.id) })
             }
 
             if (deleteChapters) {
@@ -621,6 +640,24 @@ open class MangaLibraryScreenModel(
                     downloadManager.deleteManga(manga, sourceManager.getOrStub(manga.source))
                 }
             }
+
+            if (deleteFromLibrary) _events.trySend(Event.Removed(mangaToDelete))
+        }
+    }
+
+    fun undoRemove(mangaList: List<Manga>) {
+        screenModelScope.launchNonCancellable {
+            updateManga.awaitAll(mangaList.map { MangaUpdate(favorite = true, id = it.id) })
+        }
+    }
+
+    /**
+     * Drops the covers of removed entries once the removal can no longer be undone, because this
+     * also deletes custom covers.
+     */
+    fun finishRemove(mangaList: List<Manga>) {
+        screenModelScope.launchNonCancellable {
+            mangaList.forEach { it.removeCovers(coverCache) }
         }
     }
 
@@ -673,6 +710,22 @@ open class MangaLibraryScreenModel(
                 .getLibraryItemsByCategoryId(category.id)
                 ?.randomOrNull()
         }
+    }
+
+    fun resetFilters() {
+        libraryPreferences.filterDownloadedManga().set(TriState.DISABLED)
+        libraryPreferences.filterUnread().set(TriState.DISABLED)
+        libraryPreferences.filterStartedManga().set(TriState.DISABLED)
+        libraryPreferences.filterBookmarkedManga().set(TriState.DISABLED)
+        libraryPreferences.filterCompletedManga().set(TriState.DISABLED)
+        libraryPreferences.filterIntervalCustom().set(TriState.DISABLED)
+        trackerManager.loggedInTrackers().forEach {
+            libraryPreferences.filterTrackedManga(it.id.toInt()).set(TriState.DISABLED)
+        }
+    }
+
+    fun showAllEntries() {
+        preferences.downloadedOnly().set(false)
     }
 
     fun showSettingsDialog() {
@@ -821,6 +874,12 @@ open class MangaLibraryScreenModel(
         data class SetMangaType(val manga: List<Manga>) : Dialog
     }
 
+    sealed interface Event {
+        data class MarkedRead(val read: Boolean, val entries: Int, val previous: List<ChapterUpdate>) : Event
+        data class Removed(val mangaList: List<Manga>) : Event
+        data class DownloadsQueued(val count: Int) : Event
+    }
+
     @Immutable
     private data class ItemPreferences(
         val downloadBadge: Boolean,
@@ -845,6 +904,7 @@ open class MangaLibraryScreenModel(
         val searchQuery: String? = null,
         val selection: PersistentList<LibraryManga> = persistentListOf(),
         val hasActiveFilters: Boolean = false,
+        val downloadedOnly: Boolean = false,
         val showCategoryTabs: Boolean = false,
         val showMangaCount: Boolean = false,
         val showMangaContinueButton: Boolean = false,
