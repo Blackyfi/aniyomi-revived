@@ -17,6 +17,8 @@
 
 package eu.kanade.tachiyomi.ui.player.controls
 
+import android.content.Context
+import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -60,6 +62,7 @@ import eu.kanade.presentation.theme.playerRippleConfiguration
 import eu.kanade.tachiyomi.ui.player.Dialogs
 import eu.kanade.tachiyomi.ui.player.Panels
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
+import eu.kanade.tachiyomi.ui.player.PlayerLoadingStatus
 import eu.kanade.tachiyomi.ui.player.PlayerUpdates
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
 import eu.kanade.tachiyomi.ui.player.Sheets
@@ -75,6 +78,7 @@ import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
+import eu.kanade.tachiyomi.util.torrentStatusText
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
@@ -342,6 +346,8 @@ fun PlayerControls(
                     },
                 ) {
                     val showLoadingCircle by playerPreferences.showLoadingCircle().collectAsState()
+                    val loadingStatus by viewModel.loadingStatus.collectAsState()
+                    val context = LocalContext.current
                     MiddlePlayerControls(
                         hasPrevious = hasPreviousEpisode,
                         onSkipPrevious = { viewModel.changeEpisode(true) },
@@ -352,6 +358,7 @@ fun PlayerControls(
                         controlsShown = controlsShown,
                         areControlsLocked = areControlsLocked,
                         showLoadingCircle = showLoadingCircle,
+                        loadingStatus = loadingStatus?.let { loadingStatusText(context, it) },
                         paused = paused,
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
@@ -654,3 +661,10 @@ fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> = tween(
     durationMillis = 100,
     easing = LinearOutSlowInEasing,
 )
+
+private fun loadingStatusText(context: Context, status: PlayerLoadingStatus): String? {
+    status.torrent?.let { return context.torrentStatusText(it) }
+    if (status.bytesPerSecond <= 0) return null
+    val speed = Formatter.formatShortFileSize(context, status.bytesPerSecond) + "/s"
+    return if (status.bufferingPercent in 1..99) "${status.bufferingPercent}% · $speed" else speed
+}

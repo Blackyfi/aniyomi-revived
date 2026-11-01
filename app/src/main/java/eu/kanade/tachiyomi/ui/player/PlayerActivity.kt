@@ -705,6 +705,8 @@ class PlayerActivity : BaseActivity() {
                 viewModel.setChapter(value.toFloat())
             }
             "demuxer-cache-time" -> viewModel.updateReadAhead(value = value)
+            "cache-speed" -> viewModel.updateCacheSpeed(value)
+            "cache-buffering-state" -> viewModel.updateBufferingPercent(value.toInt())
             "volume" -> viewModel.setMPVVolume(value.toInt())
             "volume-max" -> viewModel.volumeBoostCap = value.toInt() - 100
             // "chapter" -> viewModel.updateChapter(value)
