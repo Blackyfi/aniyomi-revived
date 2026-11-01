@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.ui.player.utils
 
 import androidx.core.os.LocaleListCompat
+import eu.kanade.domain.source.ContentLanguages
+import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel.VideoTrack
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
@@ -11,6 +13,7 @@ import java.util.Locale
 class TrackSelect(
     private val subtitlePreferences: SubtitlePreferences = Injekt.get(),
     private val audioPreferences: AudioPreferences = Injekt.get(),
+    private val sourcePreferences: SourcePreferences = Injekt.get(),
 ) {
 
     fun getPreferredTrackIndex(tracks: List<VideoTrack>, subtitle: Boolean = true): VideoTrack? {
@@ -32,9 +35,18 @@ class TrackSelect(
             ""
         }.split(",").filter(String::isNotEmpty).map(String::trim)
 
-        val locales = prefLangs.map(::Locale).ifEmpty {
-            listOf(LocaleListCompat.getDefault()[0]!!)
-        }
+        val deviceLocale = LocaleListCompat.getDefault()[0]!!
+        // A preferred language set for the player always wins over the content language
+        val locales = prefLangs.map(::Locale)
+            .ifEmpty {
+                ContentLanguages.playerLanguages(
+                    sourcePreferences.contentLanguageSelection().get(),
+                    deviceLocale.language,
+                )
+                    .map(::Locale)
+                    .filter(::hasIso3Language)
+            }
+            .ifEmpty { listOf(deviceLocale) }
 
         val chosenLocale = locales.firstOrNull { locale ->
             tracks.any { t -> containsLang(t, locale) }
@@ -51,6 +63,11 @@ class TrackSelect(
         return filtered.firstOrNull { (_, track) ->
             whitelist.any { track.name.contains(it, true) }
         }?.value ?: filtered.getOrNull(0)?.value
+    }
+
+    /** [containsLang] throws for a language without one, which a source's lang can be. */
+    private fun hasIso3Language(locale: Locale): Boolean {
+        return runCatching { locale.isO3Language }.isSuccess
     }
 
     private fun containsLang(track: VideoTrack, locale: Locale): Boolean {
