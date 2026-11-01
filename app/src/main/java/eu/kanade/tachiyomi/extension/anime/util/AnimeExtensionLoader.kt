@@ -18,6 +18,7 @@ import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
 import eu.kanade.tachiyomi.util.lang.Hash
 import eu.kanade.tachiyomi.util.storage.copyAndSetReadOnlyTo
 import eu.kanade.tachiyomi.util.system.ChildFirstPathClassLoader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -82,7 +83,8 @@ internal object AnimeExtensionLoader {
                 return false
             }
 
-            if (!extensionSignatures.containsAll(getSignatures(currentExtension)!!)) {
+            val currentSignatures = getSignatures(currentExtension)
+            if (currentSignatures == null || !extensionSignatures.containsAll(currentSignatures)) {
                 logcat(LogPriority.ERROR) { "Installed extension signature is not matched." }
                 return false
             }
@@ -145,7 +147,7 @@ internal object AnimeExtensionLoader {
 
                 val path = it.absolutePath
                 pkgManager.getPackageArchiveInfo(path, PACKAGE_FLAGS)
-                    ?.apply { applicationInfo!!.fixBasePaths(path) }
+                    ?.apply { applicationInfo?.fixBasePaths(path) }
             }
             ?.filter { isPackageAnExtension(it) }
             ?.map { AnimeExtensionInfo(packageInfo = it, isShared = false) }
@@ -202,7 +204,7 @@ internal object AnimeExtensionLoader {
             )
                 ?.takeIf { isPackageAnExtension(it) }
                 ?.let {
-                    it.applicationInfo!!.fixBasePaths(privateExtensionFile.absolutePath)
+                    it.applicationInfo?.fixBasePaths(privateExtensionFile.absolutePath)
                     AnimeExtensionInfo(
                         packageInfo = it,
                         isShared = false,
@@ -235,6 +237,19 @@ internal object AnimeExtensionLoader {
      * @param extensionInfo The extension to load.
      */
     private suspend fun loadExtension(context: Context, extensionInfo: AnimeExtensionInfo): AnimeLoadResult {
+        // Extensions are third-party packages and this runs on every launch: whatever is wrong with
+        // one (missing metadata, say) must cost that extension only, not leave the app crash-looping.
+        return try {
+            loadExtensionUnchecked(context, extensionInfo)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            logcat(LogPriority.ERROR, e) { "Extension load error: ${extensionInfo.packageInfo.packageName}" }
+            AnimeLoadResult.Error
+        }
+    }
+
+    private suspend fun loadExtensionUnchecked(context: Context, extensionInfo: AnimeExtensionInfo): AnimeLoadResult {
         val pkgManager = context.packageManager
 
         val pkgInfo = extensionInfo.packageInfo
@@ -397,7 +412,8 @@ internal object AnimeExtensionLoader {
      */
     private fun getSignatures(pkgInfo: PackageInfo): List<String>? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val signingInfo = pkgInfo.signingInfo!!
+            // Absent for an unsigned APK, which is reported as such by the caller.
+            val signingInfo = pkgInfo.signingInfo ?: return null
             if (signingInfo.hasMultipleSigners()) {
                 signingInfo.apkContentsSigners
             } else {

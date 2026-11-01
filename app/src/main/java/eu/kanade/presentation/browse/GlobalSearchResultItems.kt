@@ -55,7 +55,7 @@ fun GlobalSearchResultItem(
                 Text(text = subtitle)
             }
             IconButton(onClick = onClick) {
-                Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null)
+                Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = title)
             }
         }
         content()

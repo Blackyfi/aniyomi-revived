@@ -645,4 +645,5 @@
     <!-- Library update: entries left out by Smart update -->
     <string name="notification_update_skipped_text">Left out by your Smart update settings. Tap to see which and why</string>
     <string name="library_update_skipped_help">These entries were not checked for new chapters or episodes because of your choices under Settings → Library → Global update → Smart update. Each heading is the reason; change those settings to include them.</string>
+    <string name="track_login_failed">Couldn't log in to the tracker. Check your connection and try again from Settings → Tracking.</string>
 </resources>

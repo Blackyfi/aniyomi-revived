@@ -38,7 +38,7 @@ class TrackPreferences(
      * Transient OAuth 2.0 `state` for the in-progress tracker login flow, used to protect
      * against CSRF / authorization-code injection. Only one login runs at a time.
      */
-    fun trackAuthState() = preferenceStore.getString(Preference.privateKey("pref_tracker_oauth_state"), "")
+    fun trackAuthState() = preferenceStore.getString(Preference.appStateKey("pref_tracker_oauth_state"), "")
 
     fun anilistScoreType() = preferenceStore.getString("anilist_score_type", Anilist.POINT_10)
 

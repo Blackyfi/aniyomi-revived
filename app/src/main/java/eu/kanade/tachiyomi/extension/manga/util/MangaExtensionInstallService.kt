@@ -68,6 +68,15 @@ class MangaExtensionInstallService : Service() {
         installer = null
     }
 
+    /**
+     * The system's limit for a short service: a long queue of installs waiting on the user can reach
+     * it. Stopping fails what's left, which can be retried; not stopping in time is an ANR.
+     */
+    override fun onTimeout(startId: Int) {
+        logcat(LogPriority.WARN) { "Extension installer reached the short service time limit" }
+        stopSelf()
+    }
+
     override fun onBind(i: Intent?): IBinder? = null
 
     companion object {
