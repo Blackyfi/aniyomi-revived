@@ -337,11 +337,27 @@ object ImageUtil {
      */
     fun chooseBackground(context: Context, imageStream: InputStream): Drawable {
         val decoder = ImageDecoder.newInstance(imageStream)
-        val image = decoder?.decode()
+        // The algorithm only reads a few edge pixels, so a large page needn't be decoded in full: a
+        // 4649x6259 scan is 116 MB as a bitmap, on top of the copy shown on screen.
+        val image = decoder?.let { it.decode(sampleSize = backgroundSampleSize(it.width, it.height)) }
         decoder?.recycle()
 
+        if (image == null) return ColorDrawable(Color.WHITE)
+        return try {
+            chooseBackground(context, image)
+        } finally {
+            image.recycle()
+        }
+    }
+
+    private fun backgroundSampleSize(width: Int, height: Int): Int {
+        var sampleSize = 1
+        while (maxOf(width, height) / sampleSize > BACKGROUND_MAX_DIMENSION) sampleSize *= 2
+        return sampleSize
+    }
+
+    private fun chooseBackground(context: Context, image: Bitmap): Drawable {
         val whiteColor = Color.WHITE
-        if (image == null) return ColorDrawable(whiteColor)
         if (image.width < 50 || image.height < 50) {
             return ColorDrawable(whiteColor)
         }
@@ -723,6 +739,9 @@ object ImageUtil {
         else -> false
     }
 }
+
+/** Longest side [ImageUtil.chooseBackground] decodes at; its pixel offsets assume a readable page. */
+private const val BACKGROUND_MAX_DIMENSION = 2048
 
 val getDisplayMaxHeightInPx: Int
     get() = Resources.getSystem().displayMetrics.let { max(it.heightPixels, it.widthPixels) }
