@@ -67,7 +67,7 @@ private const val GRID_SELECTED_COVER_ALPHA = 0.76f
 
 /**
  * Layout of grid list item with title overlaying the cover.
- * Accepts null [title] for a cover-only view.
+ * Accepts null [title] for a cover-only view, which needs a [coverContentDescription] in its place.
  */
 @Composable
 fun EntryCompactGridItem(
@@ -76,6 +76,7 @@ fun EntryCompactGridItem(
     onLongClick: () -> Unit,
     isSelected: Boolean = false,
     title: String? = null,
+    coverContentDescription: String? = null,
     onClickContinueViewing: (() -> Unit)? = null,
     coverAlpha: Float = 1f,
     coverBadgeStart: @Composable (RowScope.() -> Unit)? = null,
@@ -93,6 +94,7 @@ fun EntryCompactGridItem(
                         .fillMaxWidth()
                         .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
                     data = coverData,
+                    contentDescription = coverContentDescription,
                 )
             },
             badgesStart = coverBadgeStart,
