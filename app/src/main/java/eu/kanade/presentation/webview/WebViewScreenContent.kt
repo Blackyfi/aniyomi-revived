@@ -45,6 +45,7 @@ import eu.kanade.tachiyomi.util.system.getHtml
 import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -119,7 +120,7 @@ fun WebViewScreenContent(
                     }
 
                     // Continue with request, but with custom headers
-                    view?.loadUrl(it.url.toString(), headers)
+                    view?.loadUrl(it.url.toString(), headersForNavigation(it.url.toString(), url, headers))
                 }
                 return super.shouldOverrideUrlLoading(view, request)
             }
@@ -270,4 +271,19 @@ fun WebViewScreenContent(
             client = webClient,
         )
     }
+}
+
+/**
+ * A source's headers can carry its cookies or tokens, so another site only gets the User-Agent,
+ * which Cloudflare checks need to keep matching.
+ */
+private fun headersForNavigation(
+    target: String,
+    sourceUrl: String,
+    headers: Map<String, String>,
+): Map<String, String> {
+    fun site(url: String) = url.toHttpUrlOrNull()?.let { it.topPrivateDomain() ?: it.host }
+    val targetSite = site(target)
+    if (targetSite != null && targetSite == site(sourceUrl)) return headers
+    return headers.filterKeys { it.equals("user-agent", ignoreCase = true) }
 }
