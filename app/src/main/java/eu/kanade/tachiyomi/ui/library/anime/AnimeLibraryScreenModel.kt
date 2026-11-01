@@ -21,12 +21,13 @@ import eu.kanade.presentation.components.SEARCH_DEBOUNCE_MILLIS
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.tachiyomi.animesource.model.SAnime
-import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.track.TrackerManager
+import eu.kanade.tachiyomi.ui.library.itemsBetween
+import eu.kanade.tachiyomi.ui.library.meanTrackerScore
 import eu.kanade.tachiyomi.ui.main.whileMainUiVisible
 import eu.kanade.tachiyomi.util.episode.getNextUnseen
 import eu.kanade.tachiyomi.util.removeBackgrounds
@@ -269,7 +270,7 @@ class AnimeLibraryScreenModel(
                     else ->
                         entry.value
                             .mapNotNull { trackerMap[it.trackerId]?.animeService?.get10PointScore(it) }
-                            .average()
+                            .let(::meanTrackerScore)
                 }
             }
         }
@@ -539,10 +540,8 @@ class AnimeLibraryScreenModel(
 
             if (deleteEpisodes) {
                 animeToDelete.forEach { anime ->
-                    val source = sourceManager.get(anime.source) as? AnimeHttpSource
-                    if (source != null) {
-                        downloadManager.deleteAnime(anime, source)
-                    }
+                    // A stub still resolves the folder when the extension has been uninstalled
+                    downloadManager.deleteAnime(anime, sourceManager.getOrStub(anime.source))
                 }
             }
         }
@@ -590,11 +589,11 @@ class AnimeLibraryScreenModel(
     }
 
     suspend fun getRandomAnimelibItemForCurrentCategory(): AnimeLibraryItem? {
-        if (state.value.categories.isEmpty()) return null
+        val category = state.value.categories.getOrNull(activeCategoryIndex) ?: return null
 
         return withIOContext {
             state.value
-                .getAnimelibItemsByCategoryId(state.value.categories[activeCategoryIndex].id)
+                .getAnimelibItemsByCategoryId(category.id)
                 ?.randomOrNull()
         }
     }
@@ -635,19 +634,9 @@ class AnimeLibraryScreenModel(
 
                 val items = state.getAnimelibItemsByCategoryId(anime.category)
                     ?.fastMap { it.libraryAnime }.orEmpty()
-                val lastAnimeIndex = items.indexOf(lastSelected)
-                val curAnimeIndex = items.indexOf(anime)
-
                 val selectedIds = list.fastMap { it.id }
-                val selectionRange = when {
-                    lastAnimeIndex < curAnimeIndex -> IntRange(lastAnimeIndex, curAnimeIndex)
-                    curAnimeIndex < lastAnimeIndex -> IntRange(curAnimeIndex, lastAnimeIndex)
-                    // We shouldn't reach this point
-                    else -> return@mutate
-                }
-                val newSelections = selectionRange.mapNotNull { index ->
-                    items[index].takeUnless { it.id in selectedIds }
-                }
+                val newSelections = itemsBetween(items, { it.id }, lastSelected.id, anime.id)
+                    .filterNot { it.id in selectedIds }
                 list.addAll(newSelections)
             }
             state.copy(selection = newSelection)
@@ -672,7 +661,7 @@ class AnimeLibraryScreenModel(
     fun invertSelection(index: Int) {
         mutableState.update { state ->
             val newSelection = state.selection.mutate { list ->
-                val categoryId = state.categories[index].id
+                val categoryId = state.categories.getOrNull(index)?.id ?: return@mutate
                 val items = state.getAnimelibItemsByCategoryId(categoryId)?.fastMap { it.libraryAnime }.orEmpty()
                 val selectedIds = list.fastMap { it.id }
                 val (toRemove, toAdd) = items.fastPartition { it.id in selectedIds }
