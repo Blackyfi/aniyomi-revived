@@ -145,6 +145,9 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         }
         MPVLib.setOptionString("demuxer-max-bytes", "${minOf(forwardMegs, maxCacheMegs) * 1024 * 1024}")
         MPVLib.setOptionString("demuxer-max-back-bytes", "${minOf(backMegs, maxCacheMegs) * 1024 * 1024}")
+        // Refill in bursts instead of continuously so the radio can idle between them. The margin
+        // is what is left to play through a network hiccup when a refill begins.
+        MPVLib.setOptionString("demuxer-hysteresis-secs", "20")
         //
         val screenshotDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
         screenshotDir.mkdirs()
