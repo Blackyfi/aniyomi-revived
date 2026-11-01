@@ -141,6 +141,16 @@ internal class HttpPageLoader(
      * Retries a page. This method is only called from user interaction on the viewer.
      */
     override fun retryPage(page: ReaderPage) {
+        if (page.status == Page.State.READY) {
+            // The page downloaded but failed to decode. The queue skips READY pages, so without
+            // this the retry button does nothing and the bad file stays cached.
+            scope.launchIO {
+                page.imageUrl?.let(chapterCache::removeImageFromCache)
+                page.status = Page.State.QUEUE
+                queue.offer(PriorityPage(page, 2))
+            }
+            return
+        }
         if (page.status == Page.State.ERROR) {
             page.status = Page.State.QUEUE
         }
