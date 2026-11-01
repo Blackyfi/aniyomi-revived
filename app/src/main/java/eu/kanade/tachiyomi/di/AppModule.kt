@@ -2,7 +2,6 @@ package eu.kanade.tachiyomi.di
 
 import android.app.Application
 import android.os.Build
-import androidx.core.content.ContextCompat
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
@@ -230,19 +229,5 @@ class AppModule(val app: Application) : InjektModule {
         addSingletonFactory { ExternalIntents() }
 
         addSingletonFactory<TorrentServerStarter> { TorrentServerStarterImpl(app) }
-
-        // Asynchronously init expensive components for a faster cold start
-        ContextCompat.getMainExecutor(app).execute {
-            get<NetworkHelper>()
-
-            get<MangaSourceManager>()
-            get<AnimeSourceManager>()
-
-            get<Database>()
-            get<AnimeDatabase>()
-
-            get<MangaDownloadManager>()
-            get<AnimeDownloadManager>()
-        }
     }
 }

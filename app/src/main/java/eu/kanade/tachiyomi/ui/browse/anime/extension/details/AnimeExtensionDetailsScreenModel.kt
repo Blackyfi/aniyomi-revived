@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -49,6 +50,8 @@ class AnimeExtensionDetailsScreenModel(
     init {
         screenModelScope.launch {
             launch {
+                // An empty list before the scan is done doesn't mean the extension was uninstalled.
+                extensionManager.isInitialized.first { it }
                 extensionManager.installedExtensionsFlow
                     .map { it.firstOrNull { extension -> extension.pkgName == pkgName } }
                     .collectLatest { extension ->

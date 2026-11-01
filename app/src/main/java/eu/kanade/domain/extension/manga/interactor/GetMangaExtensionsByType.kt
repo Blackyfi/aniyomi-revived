@@ -6,6 +6,8 @@ import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 
 class GetMangaExtensionsByType(
     private val preferences: SourcePreferences,
@@ -56,5 +58,7 @@ class GetMangaExtensionsByType(
 
             MangaExtensions(updates, installed, available, untrusted)
         }
+            // Without the scan's results installed extensions would be listed as available.
+            .onStart { extensionManager.isInitialized.first { it } }
     }
 }

@@ -27,6 +27,7 @@ import eu.kanade.domain.entries.anime.model.hasCustomBackground
 import eu.kanade.domain.entries.anime.model.hasCustomCover
 import eu.kanade.domain.entries.anime.model.toSAnime
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
+import eu.kanade.presentation.components.EntryDetailsSkeleton
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
 import eu.kanade.presentation.entries.EditCoverAction
 import eu.kanade.presentation.entries.anime.AnimeScreen
@@ -87,7 +88,7 @@ class AnimeScreen(
     @Composable
     override fun Content() {
         if (!ifAnimeSourcesLoaded()) {
-            LoadingScreen()
+            EntryDetailsSkeleton()
             return
         }
 
@@ -102,7 +103,7 @@ class AnimeScreen(
         val state by screenModel.state.collectAsStateWithLifecycle()
 
         if (state is AnimeScreenModel.State.Loading) {
-            LoadingScreen()
+            EntryDetailsSkeleton()
             return
         }
 

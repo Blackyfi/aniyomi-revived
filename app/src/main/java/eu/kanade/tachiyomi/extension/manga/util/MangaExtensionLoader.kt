@@ -10,6 +10,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import dalvik.system.PathClassLoader
 import eu.kanade.domain.extension.manga.interactor.TrustMangaExtension
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.extension.extensionInitDispatcher
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
 import eu.kanade.tachiyomi.extension.manga.model.MangaLoadResult
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -19,9 +20,11 @@ import eu.kanade.tachiyomi.util.lang.Hash
 import eu.kanade.tachiyomi.util.storage.copyAndSetReadOnlyTo
 import eu.kanade.tachiyomi.util.system.ChildFirstPathClassLoader
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
@@ -50,6 +53,7 @@ internal object MangaExtensionLoader {
         preferences.showNsfwSource().get()
     }
 
+    private const val LOAD_PARALLELISM = 4
     private const val EXTENSION_FEATURE = "tachiyomi.extension"
     private const val METADATA_SOURCE_CLASS = "tachiyomi.extension.class"
     private const val METADATA_SOURCE_FACTORY = "tachiyomi.extension.factory"
@@ -178,10 +182,12 @@ internal object MangaExtensionLoader {
 
         if (extPkgs.isEmpty()) return emptyList()
 
-        // Load each extension concurrently and wait for completion
+        // Load each extension concurrently and wait for completion. Most of the work is blocking
+        // class loading, so it needs threads of its own to actually run concurrently.
+        val dispatcher = Dispatchers.IO.limitedParallelism(LOAD_PARALLELISM)
         return runBlocking {
             val deferred = extPkgs.map {
-                async { loadMangaExtension(context, it) }
+                async(dispatcher) { loadMangaExtension(context, it) }
             }
             deferred.awaitAll()
         }
@@ -330,26 +336,30 @@ internal object MangaExtensionLoader {
             }
             .flatMap {
                 try {
-                    when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
-                        is MangaSource -> listOf(obj)
-                        is SourceFactory -> obj.createSources()
-                        else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                    withContext(extensionInitDispatcher) {
+                        when (val obj = Class.forName(it, false, classLoader).getDeclaredConstructor().newInstance()) {
+                            is MangaSource -> listOf(obj)
+                            is SourceFactory -> obj.createSources()
+                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
+                        }
                     }
                 } catch (e: LinkageError) {
                     try {
                         val fallBackClassLoader = PathClassLoader(appInfo.sourceDir, null, context.classLoader)
-                        when (
-                            val obj = Class.forName(
-                                it,
-                                false,
-                                fallBackClassLoader,
-                            ).getDeclaredConstructor().newInstance()
-                        ) {
-                            is MangaSource -> {
-                                listOf(obj)
+                        withContext(extensionInitDispatcher) {
+                            when (
+                                val obj = Class.forName(
+                                    it,
+                                    false,
+                                    fallBackClassLoader,
+                                ).getDeclaredConstructor().newInstance()
+                            ) {
+                                is MangaSource -> {
+                                    listOf(obj)
+                                }
+                                is SourceFactory -> obj.createSources()
+                                else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                             }
-                            is SourceFactory -> obj.createSources()
-                            else -> throw Exception("Unknown source class type: ${obj.javaClass}")
                         }
                     } catch (e: Throwable) {
                         logcat(LogPriority.ERROR, e) { "Extension load error: $extName ($it)" }

@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension.anime
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import androidx.core.os.trace
 import eu.kanade.domain.extension.anime.interactor.TrustAnimeExtension
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
@@ -15,6 +16,7 @@ import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionLoader
 import eu.kanade.tachiyomi.util.system.doOnTrimMemoryBackground
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,8 +24,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import logcat.LogPriority
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
@@ -33,6 +40,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The manager of anime extensions installed as another apk which extend the available sources. It handles
@@ -77,14 +85,27 @@ class AnimeExtensionManager(
     val untrustedExtensionsFlow = untrustedExtensionsMapFlow.mapExtensions(scope)
 
     init {
-        initAnimeExtensions()
+        // Scanning loads every extension's classes and instantiates its sources, which took the
+        // main thread for as long as the scan lasted. Nothing needs it to draw the first frame:
+        // the source managers and the UI wait on [isInitialized].
+        scope.launch(Dispatchers.IO) { initAnimeExtensions() }
         AnimeExtensionInstallReceiver(AnimeInstallationListener()).register(context)
         context.doOnTrimMemoryBackground { iconMap.clear() }
     }
 
     private var subLanguagesEnabledOnFirstRun = preferences.enabledLanguages().isSet()
 
+    /**
+     * Blocks until the initial scan has finished, for the few synchronous lookups that have to
+     * answer from the complete list. The timeout only guards against a hung extension.
+     */
+    private fun awaitInitializedBlocking() {
+        if (_isInitialized.value) return
+        runBlocking { withTimeoutOrNull(INIT_WAIT_TIMEOUT) { _isInitialized.first { it } } }
+    }
+
     fun getExtensionPackage(sourceId: Long): String? {
+        awaitInitializedBlocking()
         return installedExtensionsFlow.value.find { extension ->
             extension.sources.any { it.id == sourceId }
         }
@@ -101,6 +122,7 @@ class AnimeExtensionManager(
     }
 
     fun getAppIconForSource(sourceId: Long): Drawable? {
+        awaitInitializedBlocking()
         val pkgName = installedExtensionsMapFlow.value.values
             .find { ext ->
                 ext.sources.any { it.id == sourceId }
@@ -130,17 +152,27 @@ class AnimeExtensionManager(
     /**
      * Loads and registers the installed animeextensions.
      */
-    private fun initAnimeExtensions() {
-        val animeextensions = AnimeExtensionLoader.loadExtensions(context)
+    private suspend fun initAnimeExtensions() {
+        try {
+            val animeextensions = trace("AnimeExtensionScan") { AnimeExtensionLoader.loadExtensions(context) }
 
-        installedExtensionsMapFlow.value = animeextensions
-            .filterIsInstance<AnimeLoadResult.Success>()
-            .associate { it.extension.pkgName to it.extension }
+            val installed = animeextensions
+                .filterIsInstance<AnimeLoadResult.Success>()
+                .associate { it.extension.pkgName to it.extension }
+            val untrusted = animeextensions
+                .filterIsInstance<AnimeLoadResult.Untrusted>()
+                .associate { it.extension.pkgName to it.extension }
 
-        untrustedExtensionsMapFlow.value = animeextensions
-            .filterIsInstance<AnimeLoadResult.Untrusted>()
-            .associate { it.extension.pkgName to it.extension }
+            // The install receiver is already live: whatever it reported during the scan is newer.
+            installedExtensionsMapFlow.update { installed + it }
+            untrustedExtensionsMapFlow.update { untrusted + it }
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e) { "Failed to load installed extensions" }
+        }
 
+        // installedExtensionsFlow mirrors the map asynchronously. Wait for it, so that whatever
+        // isInitialized releases reads the scanned list rather than the initial empty one.
+        installedExtensionsFlow.first { it.size == installedExtensionsMapFlow.value.size }
         _isInitialized.value = true
     }
 
@@ -148,6 +180,9 @@ class AnimeExtensionManager(
      * Finds the available anime extensions in the [api] and updates [availableExtensionsMapFlow].
      */
     suspend fun findAvailableExtensions() {
+        // Update flags are computed against the installed list, so it has to be there first.
+        _isInitialized.first { it }
+
         val extensions: List<AnimeExtension.Available> = try {
             api.findExtensions()
         } catch (e: Exception) {
@@ -399,3 +434,5 @@ class AnimeExtensionManager(
         return map { it.values.toList() }.stateIn(scope, SharingStarted.Lazily, value.values.toList())
     }
 }
+
+private val INIT_WAIT_TIMEOUT = 20.seconds

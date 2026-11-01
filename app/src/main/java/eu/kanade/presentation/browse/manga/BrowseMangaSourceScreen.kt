@@ -20,6 +20,7 @@ import eu.kanade.presentation.browse.manga.components.BrowseMangaSourceComfortab
 import eu.kanade.presentation.browse.manga.components.BrowseMangaSourceCompactGrid
 import eu.kanade.presentation.browse.manga.components.BrowseMangaSourceList
 import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.components.EntryCollectionSkeleton
 import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.source.MangaSource
 import kotlinx.collections.immutable.persistentListOf
@@ -33,7 +34,6 @@ import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
-import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.entries.manga.LocalMangaSource
 
 @Composable
@@ -112,8 +112,10 @@ fun BrowseSourceContent(
     }
 
     if (mangaList.itemCount == 0 && mangaList.loadState.refresh is LoadState.Loading) {
-        LoadingScreen(
-            modifier = Modifier.padding(contentPadding),
+        EntryCollectionSkeleton(
+            displayMode = displayMode,
+            columns = columns,
+            contentPadding = contentPadding,
         )
         return
     }

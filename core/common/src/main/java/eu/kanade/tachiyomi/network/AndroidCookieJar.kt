@@ -7,7 +7,10 @@ import okhttp3.HttpUrl
 
 class AndroidCookieJar : CookieJar {
 
-    private val manager = CookieManager.getInstance()
+    // Fetching this starts WebView, which needs the main thread and so must wait for it. NetworkHelper
+    // can be built off the main thread while the main thread waits for NetworkHelper, so it has to
+    // happen on first use rather than here.
+    private val manager by lazy { CookieManager.getInstance() }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
         val urlString = url.toString()
