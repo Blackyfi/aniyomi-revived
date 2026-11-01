@@ -78,12 +78,14 @@ import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
+import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -207,6 +209,8 @@ class PlayerActivity : BaseActivity() {
                 withUIContext {
                     setInitialEpisodeError(exception)
                 }
+                viewModel.updateIsLoadingHosters(false)
+                return@launchNonCancellable
             }
 
             viewModel.updateIsLoadingHosters(false)
@@ -488,29 +492,28 @@ class PlayerActivity : BaseActivity() {
         if (advancedPlayerPreferences.mpvUserFiles().get()) {
             storageManager.getScriptsDirectory()?.listFiles()?.forEach { file ->
                 val outFile = scriptsDir()?.createFile(file.name)
-                outFile?.let {
-                    file.openInputStream().copyTo(it.openOutputStream())
-                }
+                outFile?.let { file.copyContentsTo(it) }
             }
             storageManager.getScriptOptsDirectory()?.listFiles()?.forEach { file ->
                 val outFile = scriptOptsDir()?.createFile(file.name)
-                outFile?.let {
-                    file.openInputStream().copyTo(it.openOutputStream())
-                }
+                outFile?.let { file.copyContentsTo(it) }
             }
             storageManager.getShadersDirectory()?.listFiles()?.forEach { file ->
                 val outFile = shadersDir()?.createFile(file.name)
-                outFile?.let {
-                    file.openInputStream().copyTo(it.openOutputStream())
-                }
+                outFile?.let { file.copyContentsTo(it) }
             }
         }
 
         // Copy over the bridge file
         val luaFile = scriptsDir()?.createFile("aniyomi.lua")
-        val luaBridge = assets.open("aniyomi.lua")
         luaFile?.openOutputStream()?.bufferedWriter()?.use { scriptLua ->
-            luaBridge.bufferedReader().use { scriptLua.write(it.readText()) }
+            assets.open("aniyomi.lua").bufferedReader().use { scriptLua.write(it.readText()) }
+        }
+    }
+
+    private fun UniFile.copyContentsTo(target: UniFile) {
+        openInputStream().use { input ->
+            target.openOutputStream().use { input.copyTo(it) }
         }
     }
 
@@ -544,14 +547,15 @@ class PlayerActivity : BaseActivity() {
     private fun copyFontsDirectory(mpvDir: UniFile) {
         // TODO: I think this is a bad hack.
         //  We need to find a way to let MPV directly access our fonts directory.
-        CoroutineScope(Dispatchers.IO).launchIO {
+        lifecycleScope.launchIO {
             val fontsDirectory = mpvDir.createDirectory(MPV_FONTS_DIR)!!
 
             storageManager.getFontsDirectory()?.listFiles()?.forEach { font ->
-                val outFile = fontsDirectory.createFile(font.name)
-                outFile?.let {
-                    font.openInputStream().copyTo(it.openOutputStream())
-                }
+                ensureActive()
+                val outFile = fontsDirectory.createFile(font.name) ?: return@forEach
+                // Fonts can be megabytes each and rarely change. An interrupted copy leaves a
+                // different length, so it's redone next time.
+                if (outFile.length() != font.length()) font.copyContentsTo(outFile)
             }
 
             MPVLib.setPropertyString("sub-fonts-dir", fontsDirectory.filePath!!)
@@ -697,6 +701,8 @@ class PlayerActivity : BaseActivity() {
                 viewModel.setChapter(value.toFloat())
             }
             "demuxer-cache-time" -> viewModel.updateReadAhead(value = value)
+            "cache-speed" -> viewModel.updateCacheSpeed(value)
+            "cache-buffering-state" -> viewModel.updateBufferingPercent(value.toInt())
             "volume" -> viewModel.setMPVVolume(value.toInt())
             "volume-max" -> viewModel.volumeBoostCap = value.toInt() - 100
             // "chapter" -> viewModel.updateChapter(value)
@@ -733,12 +739,14 @@ class PlayerActivity : BaseActivity() {
                 }
             }
 
+            // Either one ending doesn't mean playback is back: a seek finishing while the cache is
+            // still filling used to drop the indicator for the rest of the stall.
             "paused-for-cache" -> {
-                viewModel.isLoading.update { value }
+                viewModel.isLoading.update { value || player.isSeeking == true }
             }
 
             "seeking" -> {
-                viewModel.isLoading.update { value }
+                viewModel.isLoading.update { value || player.isPausedForCache == true }
             }
 
             "eof-reached" -> {
@@ -773,7 +781,10 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         when (property) {
             "speed" -> viewModel.playbackSpeed.update { value.toFloat() }
-            "video-params/aspect" -> if (isPipSupportedAndEnabled) createPipParams()
+            // The params set when playback started couldn't know the aspect yet.
+            "video-params/aspect" -> if (isPipSupportedAndEnabled) {
+                runCatching { setPictureInPictureParams(createPipParams()) }
+            }
         }
     }
 
@@ -781,6 +792,8 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         when (eventId) {
             MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
+                // Failure of the file this one replaced can be delivered after the switch was made.
+                viewModel.clearPlaybackError()
                 viewModel.viewModelScope.launchIO { fileLoaded() }
             }
             MPVLib.mpvEventId.MPV_EVENT_SEEK -> viewModel.isLoading.update { true }
@@ -813,9 +826,11 @@ class PlayerActivity : BaseActivity() {
             ),
         )
         builder.setSourceRectHint(pipRect)
-        player.videoH?.let {
-            val height = it
-            val width = it * player.getVideoOutAspect()!!
+        val videoHeight = player.videoH
+        val videoAspect = player.getVideoOutAspect()
+        if (videoHeight != null && videoAspect != null) {
+            val height = videoHeight
+            val width = videoHeight * videoAspect
             val rational = Rational(height, width.toInt()).toFloat()
             if (rational in 0.42..2.38) builder.setAspectRatio(Rational(width.toInt(), height))
         }
@@ -1031,6 +1046,7 @@ class PlayerActivity : BaseActivity() {
         viewModel.panelShown.update { _ -> Panels.None }
         viewModel.pause()
         viewModel.isLoading.update { _ -> true }
+        viewModel.clearPlaybackError()
         viewModel.resetHosterState()
 
         lifecycleScope.launch {
@@ -1071,6 +1087,7 @@ class PlayerActivity : BaseActivity() {
                         }
                     } else {
                         logcat(LogPriority.ERROR) { "Error getting links" }
+                        setInitialEpisodeError(switchMethod.error ?: IllegalStateException("Error getting links"))
                     }
 
                     if (isInPictureInPictureMode && pipEpisodeToasts) {
@@ -1092,6 +1109,7 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         if (video == null) return
 
+        viewModel.clearPlaybackError()
         setHttpOptions(video)
 
         if (viewModel.isLoadingEpisode.value) {
@@ -1127,17 +1145,46 @@ class PlayerActivity : BaseActivity() {
     }
 
     /**
-     * Called from the presenter if the initial load couldn't load the videos of the episode. In
-     * this case the activity is closed and a toast is shown to the user.
+     * Called from the presenter if it couldn't load the videos of the episode. The user gets the
+     * cause and a way to retry, unless there's no episode to retry, which closes the activity.
      */
     private fun setInitialEpisodeError(error: Throwable) {
-        if (error is PlayerViewModel.ExceptionWithStringResource) {
-            toast(error.stringResource)
-        } else {
-            toast(error.message)
-        }
         logcat(LogPriority.ERROR, error)
-        finish()
+        if (viewModel.currentEpisode.value == null) {
+            toast(describeError(error))
+            finish()
+        } else {
+            viewModel.showPlaybackError(describeError(error))
+        }
+    }
+
+    internal fun onPlaybackFailed(message: String) {
+        viewModel.showPlaybackError(message)
+    }
+
+    internal fun describeError(error: Throwable): String {
+        return if (error is PlayerViewModel.ExceptionWithStringResource) {
+            stringResource(error.stringResource)
+        } else {
+            error.message ?: error.javaClass.simpleName
+        }
+    }
+
+    /** Tries the episode again from its hosters, as the links of the failed attempt may have expired. */
+    fun retryPlayback() {
+        changeEpisode(viewModel.currentEpisode.value?.id)
+    }
+
+    /** Null when the episode has no page to open. */
+    fun episodeWebViewOpener(): (() -> Unit)? {
+        val source = viewModel.currentSource.value as? AnimeHttpSource ?: return null
+        val episode = viewModel.currentEpisode.value ?: return null
+        val url = runCatching { source.getEpisodeUrl(episode) }.getOrNull() ?: return null
+        return {
+            startActivity(
+                WebViewActivity.newIntent(this, url, source.id, viewModel.currentAnime.value?.title, isAnime = true),
+            )
+        }
     }
 
     fun parseVideoUrl(videoUrl: String?): String? {

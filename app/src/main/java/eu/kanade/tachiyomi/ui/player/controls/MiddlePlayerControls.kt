@@ -10,8 +10,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -51,6 +54,7 @@ fun MiddlePlayerControls(
     controlsShown: Boolean,
     areControlsLocked: Boolean,
     showLoadingCircle: Boolean,
+    loadingStatus: String?,
     paused: Boolean,
     gestureSeekAmount: Pair<Int, Int>?,
     onPlayPauseClick: () -> Unit,
@@ -77,6 +81,7 @@ fun MiddlePlayerControls(
                 ControlsButton(
                     Icons.Filled.SkipPrevious,
                     onClick = onSkipPrevious,
+                    title = stringResource(AYMR.strings.player_action_previous_episode),
                     iconSize = 48.dp,
                     enabled = hasPrevious,
                 )
@@ -102,7 +107,25 @@ fun MiddlePlayerControls(
                 )
             }
 
-            (isLoading || isLoadingEpisode) && showLoadingCircle -> CircularProgressIndicator(Modifier.size(96.dp))
+            (isLoading || isLoadingEpisode) && showLoadingCircle -> Box(
+                Modifier.size(96.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(Modifier.size(96.dp))
+                if (loadingStatus != null) {
+                    Text(
+                        text = loadingStatus,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            shadow = Shadow(Color.Black, blurRadius = 5f),
+                        ),
+                        textAlign = TextAlign.Center,
+                        // Wider than the indicator, and hanging below it, without moving the controls.
+                        modifier = Modifier
+                            .requiredWidth(280.dp)
+                            .offset(y = 72.dp),
+                    )
+                }
+            }
             else -> {
                 AnimatedVisibility(
                     visible = controlsShown && !areControlsLocked,
@@ -120,7 +143,9 @@ fun MiddlePlayerControls(
                                 onClick = onPlayPauseClick,
                             )
                             .padding(MaterialTheme.padding.medium),
-                        contentDescription = null,
+                        contentDescription = stringResource(
+                            if (paused) AYMR.strings.player_action_play else AYMR.strings.player_action_pause,
+                        ),
                     )
                 }
             }
@@ -135,6 +160,7 @@ fun MiddlePlayerControls(
                 ControlsButton(
                     Icons.Filled.SkipNext,
                     onClick = onSkipNext,
+                    title = stringResource(AYMR.strings.player_action_next_episode),
                     iconSize = 48.dp,
                     enabled = hasNext,
                 )

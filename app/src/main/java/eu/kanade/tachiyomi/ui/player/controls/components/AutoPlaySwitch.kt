@@ -3,13 +3,13 @@ package eu.kanade.tachiyomi.ui.player.controls.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PauseCircle
@@ -25,9 +25,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.ui.player.controls.LocalPlayerButtonsClickEvent
+import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.presentation.core.i18n.stringResource
 
 @Composable
 fun AutoPlaySwitch(
@@ -63,14 +68,19 @@ fun AutoPlaySwitch(
         )
     }
 
+    val autoPlayLabel = stringResource(AYMR.strings.player_action_autoplay)
     Box(
-        modifier = modifier.clickable(
-            interactionSource = interactionSource,
-            indication = null,
-        ) {
-            clickEvent()
-            onToggleAutoPlay(!isChecked)
-        },
+        modifier = modifier
+            .toggleable(
+                value = isChecked,
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Switch,
+            ) {
+                clickEvent()
+                onToggleAutoPlay(it)
+            }
+            .semantics { contentDescription = autoPlayLabel },
         contentAlignment = Alignment.Center,
     ) {
         Box(

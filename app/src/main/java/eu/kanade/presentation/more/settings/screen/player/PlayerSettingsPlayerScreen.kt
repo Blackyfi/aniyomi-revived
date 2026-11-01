@@ -127,6 +127,16 @@ object PlayerSettingsPlayerScreen : SearchableSettings {
             title = stringResource(AYMR.strings.pref_hosters),
             preferenceItems = persistentListOf(
                 Preference.PreferenceItem.SwitchPreference(
+                    preference = playerPreferences.startOnFirstHoster(),
+                    title = stringResource(AYMR.strings.pref_hosters_start_on_first),
+                    subtitle = stringResource(AYMR.strings.pref_hosters_start_on_first_summary),
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = playerPreferences.prepareNextEpisode(),
+                    title = stringResource(AYMR.strings.pref_hosters_prepare_next),
+                    subtitle = stringResource(AYMR.strings.pref_hosters_prepare_next_summary),
+                ),
+                Preference.PreferenceItem.SwitchPreference(
                     preference = showFailure,
                     title = stringResource(AYMR.strings.pref_hosters_show_failure),
                 ),

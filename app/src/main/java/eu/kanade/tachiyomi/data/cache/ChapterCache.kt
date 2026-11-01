@@ -153,12 +153,20 @@ class ChapterCache(
             // Get OutputStream and write image with Okio.
             response.body.source().saveTo(editor.newOutputStream(0))
 
-            diskCache.flush()
             editor.commit()
         } finally {
             response.body.close()
             editor?.abortUnlessCommitted()
         }
+    }
+
+    /**
+     * Drops a cached image, e.g. one the decoder rejected, so that it's fetched again.
+     *
+     * @param imageUrl url of image.
+     */
+    fun removeImageFromCache(imageUrl: String) {
+        removeFileFromCache(DiskUtil.hashKeyForDisk(imageUrl) + ".0")
     }
 
     fun clear(): Int {

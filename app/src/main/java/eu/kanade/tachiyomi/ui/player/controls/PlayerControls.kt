@@ -17,6 +17,8 @@
 
 package eu.kanade.tachiyomi.ui.player.controls
 
+import android.content.Context
+import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -44,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -55,11 +58,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
+import eu.kanade.presentation.components.LoadFailureAction
+import eu.kanade.presentation.components.LoadFailureOverlay
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
 import eu.kanade.tachiyomi.ui.player.Dialogs
 import eu.kanade.tachiyomi.ui.player.Panels
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
+import eu.kanade.tachiyomi.ui.player.PlayerLoadingStatus
 import eu.kanade.tachiyomi.ui.player.PlayerUpdates
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
 import eu.kanade.tachiyomi.ui.player.Sheets
@@ -75,10 +81,14 @@ import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
+import eu.kanade.tachiyomi.util.torrentStatusText
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
@@ -105,7 +115,14 @@ fun PlayerControls(
     val controlsShown by viewModel.controlsShown.collectAsState()
     val areControlsLocked by viewModel.areControlsLocked.collectAsState()
     val seekBarShown by viewModel.seekBarShown.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val isLoading by produceState(false, viewModel) {
+        // Most seeks land within the cache. Waiting a moment keeps those from flashing the spinner
+        // and hiding the play button, and costs a real stall little.
+        viewModel.isLoading.collectLatest { loading ->
+            if (loading) delay(LOADING_INDICATOR_DELAY_MS)
+            value = loading
+        }
+    }
     val isLoadingEpisode by viewModel.isLoadingEpisode.collectAsState()
     val duration by viewModel.duration.collectAsState()
     val position by viewModel.pos.collectAsState()
@@ -325,6 +342,7 @@ fun PlayerControls(
                     ControlsButton(
                         Icons.Filled.Lock,
                         onClick = { viewModel.unlockControls() },
+                        title = stringResource(AYMR.strings.player_action_unlock_controls),
                     )
                 }
                 AnimatedVisibility(
@@ -342,6 +360,8 @@ fun PlayerControls(
                     },
                 ) {
                     val showLoadingCircle by playerPreferences.showLoadingCircle().collectAsState()
+                    val loadingStatus by viewModel.loadingStatus.collectAsState()
+                    val context = LocalContext.current
                     MiddlePlayerControls(
                         hasPrevious = hasPreviousEpisode,
                         onSkipPrevious = { viewModel.changeEpisode(true) },
@@ -352,6 +372,7 @@ fun PlayerControls(
                         controlsShown = controlsShown,
                         areControlsLocked = areControlsLocked,
                         showLoadingCircle = showLoadingCircle,
+                        loadingStatus = loadingStatus?.let { loadingStatusText(context, it) },
                         paused = paused,
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
@@ -549,6 +570,29 @@ fun PlayerControls(
         val selectedSubtitles by viewModel.selectedSubtitles.collectAsState()
         val audioTracks by viewModel.audioTracks.collectAsState()
         val selectedAudio by viewModel.selectedAudio.collectAsState()
+        val playbackError by viewModel.playbackError.collectAsState()
+        val playerActivity = LocalContext.current as PlayerActivity
+        playbackError?.let { message ->
+            val webViewOpener = remember(message) { playerActivity.episodeWebViewOpener() }
+            LoadFailureOverlay(
+                message = message,
+                actions = buildList {
+                    add(LoadFailureAction(stringResource(MR.strings.action_retry), playerActivity::retryPlayback))
+                    if (viewModel.hosterState.value.isNotEmpty()) {
+                        add(
+                            LoadFailureAction(stringResource(AYMR.strings.player_action_switch_host)) {
+                                viewModel.showSheet(Sheets.QualityTracks)
+                            },
+                        )
+                    }
+                    webViewOpener?.let {
+                        add(LoadFailureAction(stringResource(MR.strings.action_open_in_web_view), it))
+                    }
+                    add(LoadFailureAction(stringResource(MR.strings.action_close), playerActivity::finish))
+                },
+            )
+        }
+
         val isLoadingHosters by viewModel.isLoadingHosters.collectAsState()
         val hosterState by viewModel.hosterState.collectAsState()
         val expandedState by viewModel.hosterExpandedList.collectAsState()
@@ -654,3 +698,12 @@ fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> = tween(
     durationMillis = 100,
     easing = LinearOutSlowInEasing,
 )
+
+private const val LOADING_INDICATOR_DELAY_MS = 400L
+
+private fun loadingStatusText(context: Context, status: PlayerLoadingStatus): String? {
+    status.torrent?.let { return context.torrentStatusText(it) }
+    if (status.bytesPerSecond <= 0) return null
+    val speed = Formatter.formatShortFileSize(context, status.bytesPerSecond) + "/s"
+    return if (status.bufferingPercent in 1..99) "${status.bufferingPercent}% · $speed" else speed
+}
