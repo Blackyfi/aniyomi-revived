@@ -142,6 +142,8 @@ internal object MangaExtensionLoader {
             .filter { isPackageAnExtension(it) }
             .map { MangaExtensionInfo(packageInfo = it, isShared = true) }
 
+        // A list, not a lazy sequence: it's looked through once per extension below, and every pass
+        // over a sequence would parse and verify each private APK again.
         val privateExtPkgs = getPrivateExtensionDir(context)
             .listFiles()
             ?.asSequence()
@@ -158,7 +160,8 @@ internal object MangaExtensionLoader {
             }
             ?.filter { isPackageAnExtension(it) }
             ?.map { MangaExtensionInfo(packageInfo = it, isShared = false) }
-            ?: emptySequence()
+            ?.toList()
+            ?: emptyList()
 
         val extPkgs = (sharedExtPkgs + privateExtPkgs)
             // Remove duplicates. Shared takes priority than private by default
