@@ -35,6 +35,7 @@ fun OnboardingScreen(
     val steps = remember {
         listOf(
             ThemeStep(),
+            ContentLanguageStep(),
             StorageStep(),
             PermissionStep(),
             GuidesStep(onRestoreBackup = onRestoreBackup),
