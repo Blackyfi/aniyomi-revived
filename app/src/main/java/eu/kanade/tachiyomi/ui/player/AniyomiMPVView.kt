@@ -78,6 +78,12 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         get() = getPropertyBoolean("pause")
         set(paused) = MPVLib.setPropertyBoolean("pause", paused!!)
 
+    val isSeeking: Boolean?
+        get() = getPropertyBoolean("seeking")
+
+    val isPausedForCache: Boolean?
+        get() = getPropertyBoolean("paused-for-cache")
+
     val hwdecActive: String
         get() = getPropertyString("hwdec-current") ?: "no"
 
@@ -118,15 +124,16 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         MPVLib.setPropertyBoolean("pause", true)
         MPVLib.setOptionString("profile", "fast")
         MPVLib.setOptionString("hwdec", if (decoderPreferences.tryHWDecoding().get()) "auto" else "no")
-        when (decoderPreferences.videoDebanding().get()) {
-            Debanding.None -> {}
-            Debanding.CPU -> MPVLib.setOptionString("vf", "gradfun=radius=12")
-            Debanding.GPU -> MPVLib.setOptionString("deband", "yes")
-        }
+        val debanding = decoderPreferences.videoDebanding().get()
+        if (debanding == Debanding.GPU) MPVLib.setOptionString("deband", "yes")
 
-        if (decoderPreferences.useYUV420P().get()) {
-            MPVLib.setOptionString("vf", "format=yuv420p")
-        }
+        // One option holds the whole chain: setting it twice keeps only the last filter.
+        listOfNotNull(
+            "format=yuv420p".takeIf { decoderPreferences.useYUV420P().get() },
+            "gradfun=radius=12".takeIf { debanding == Debanding.CPU },
+        )
+            .takeIf { it.isNotEmpty() }
+            ?.let { MPVLib.setOptionString("vf", it.joinToString(",")) }
         MPVLib.setOptionString("msg-level", "all=" + if (networkPreferences.verboseLogging().get()) "v" else "warn")
 
         MPVLib.setPropertyBoolean("keep-open", true)
@@ -135,6 +142,10 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         MPVLib.setOptionString("ytdl", "no")
         MPVLib.setOptionString("tls-verify", "yes")
         MPVLib.setOptionString("tls-ca-file", "${context.filesDir.path}/${PlayerActivity.MPV_DIR}/cacert.pem")
+
+        // A stalled host otherwise hangs for mpv's default of a minute before failing. Torrents, which
+        // can legitimately go quiet for longer, set their own per file.
+        MPVLib.setOptionString("network-timeout", "30")
 
         // Limit demuxer cache since the defaults are too high for mobile devices
         val maxCacheMegs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) 64 else 32
@@ -224,6 +235,8 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
 
         "time-pos" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "demuxer-cache-time" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "cache-speed" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "cache-buffering-state" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "duration" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "volume" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "volume-max" to MPVLib.mpvFormat.MPV_FORMAT_INT64,

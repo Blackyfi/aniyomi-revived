@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.torrentServer.model.BtSets
 import eu.kanade.tachiyomi.torrentServer.model.FileStat
 import eu.kanade.tachiyomi.torrentServer.model.Torrent
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
 import java.io.File
@@ -60,6 +61,21 @@ object TorrentServerUtils {
         return "$hostUrl/stream/${name?.urlEncode().orEmpty()}?link=${torrent.hash}&index=$index&play".also {
             logcat(LogPriority.INFO) { "[Torrent] play link (index=$index, file='$name'): $it" }
         }
+    }
+
+    /**
+     * Info hash of the torrent behind [url] if it's a stream link of this device's server (see
+     * [eu.kanade.tachiyomi.torrentutils.TorrentUtils.getStreamUrl]), otherwise null.
+     */
+    fun streamHash(url: String): String? = parseStreamHash(url, preferences.port().get())
+
+    fun parseStreamHash(url: String, port: Int): String? {
+        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        if (httpUrl.host != "127.0.0.1" || httpUrl.port != port) return null
+        if (!httpUrl.encodedPath.startsWith("/stream/")) return null
+        // The link is either a magnet or the bare hash.
+        val link = httpUrl.queryParameter("link") ?: return null
+        return link.substringAfter("btih:", link).substringBefore('&').ifBlank { null }
     }
 
     private fun findFile(torrent: Torrent, index: Int): FileStat? {

@@ -13,6 +13,8 @@ class ReaderPreferences(
 
     // region General
 
+    fun preloadPages() = preferenceStore.getInt("pref_reader_preload_pages", 4)
+
     fun pageTransitions() = preferenceStore.getBoolean("pref_enable_transitions_key", true)
 
     fun flashOnPageChange() = preferenceStore.getBoolean("pref_reader_flash", false)

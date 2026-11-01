@@ -27,6 +27,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.inputmethod.InputMethodManager
@@ -69,6 +70,8 @@ import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
 import eu.kanade.tachiyomi.torrentServer.TorrentServerApi
 import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
+import eu.kanade.tachiyomi.torrentServer.model.TorrentLoadStatus
+import eu.kanade.tachiyomi.torrentServer.model.toLoadStatus
 import eu.kanade.tachiyomi.ui.player.controls.components.IndexedSegment
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.getChangedAt
@@ -88,10 +91,12 @@ import eu.kanade.tachiyomi.util.lang.byteSize
 import eu.kanade.tachiyomi.util.lang.takeBytes
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
+import eu.kanade.tachiyomi.util.system.isConnectedToWifi
 import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -99,12 +104,19 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withTimeoutOrNull
 import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
@@ -137,6 +149,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
 import java.io.InputStream
+import java.net.SocketTimeoutException
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
@@ -249,6 +262,18 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _readAhead = MutableStateFlow(0f)
     val readAhead = _readAhead.asStateFlow()
 
+    private val cacheSpeed = MutableStateFlow(0L)
+    private val bufferingPercent = MutableStateFlow(0)
+
+    /** Hash of the torrent being played, if any. */
+    private val torrentHash = MutableStateFlow<String?>(null)
+    private val torrentStatus = MutableStateFlow<TorrentLoadStatus?>(null)
+
+    private val _playbackError = MutableStateFlow<String?>(null)
+
+    /** Why there's nothing to play, while the player stays open offering a way out. */
+    val playbackError = _playbackError.asStateFlow()
+
     private val _paused = MutableStateFlow(false)
     val paused = _paused.asStateFlow()
 
@@ -308,7 +333,39 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _primaryButton = MutableStateFlow<CustomButton?>(null)
     val primaryButton = _primaryButton.asStateFlow()
 
+    /**
+     * What to tell the user while the loading indicator is up, null the rest of the time so that the
+     * cache figures changing during playback don't recompose anything.
+     */
+    val loadingStatus = combine(
+        combine(isLoading, isLoadingEpisode) { loading, loadingEpisode -> loading || loadingEpisode },
+        cacheSpeed,
+        bufferingPercent,
+        torrentStatus,
+    ) { loading, speed, percent, torrent ->
+        if (loading) PlayerLoadingStatus(speed, percent, torrent) else null
+    }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
+
     init {
+        viewModelScope.launch {
+            combine(isLoading, isLoadingEpisode, torrentHash) { loading, loadingEpisode, hash ->
+                hash.takeIf { loading || loadingEpisode }
+            }
+                .distinctUntilChanged()
+                .collectLatest { hash ->
+                    torrentStatus.value = hash?.let { TorrentLoadStatus() }
+                    if (hash == null) return@collectLatest
+                    while (true) {
+                        // Fails while the server is starting or hasn't been handed the torrent yet.
+                        runCatching { withIOContext { TorrentServerApi.getTorrent(hash) } }
+                            .getOrNull()
+                            ?.let { torrentStatus.value = it.toLoadStatus() }
+                        delay(TORRENT_STATUS_INTERVAL_MS)
+                    }
+                }
+        }
         viewModelScope.launchIO {
             try {
                 val buttons = getCustomButtons.getAll()
@@ -554,6 +611,25 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun updateReadAhead(value: Long) {
         _readAhead.update { value.toFloat() }
+    }
+
+    fun showPlaybackError(message: String) {
+        _playbackError.value = message
+        isLoading.update { _ -> false }
+        updateIsLoadingEpisode(false)
+        updateIsLoadingHosters(false)
+    }
+
+    fun clearPlaybackError() {
+        _playbackError.value = null
+    }
+
+    fun updateCacheSpeed(bytesPerSecond: Long) {
+        cacheSpeed.update { bytesPerSecond }
+    }
+
+    fun updateBufferingPercent(percent: Int) {
+        bufferingPercent.update { percent }
     }
 
     private fun updatePausedState() {
@@ -958,6 +1034,9 @@ class PlayerViewModel @JvmOverloads constructor(
         _hosterList.update { _ -> emptyList() }
         _hosterExpandedList.update { _ -> emptyList() }
         _selectedHosterVideoIndex.update { _ -> Pair(-1, -1) }
+        // loadVideo only falls back to another hoster when nothing is playing, so the last episode's
+        // video left here turned a failed video in this one into an endless spinner.
+        _currentVideo.update { _ -> null }
     }
 
     fun changeEpisode(previous: Boolean, autoPlay: Boolean = false) {
@@ -1285,6 +1364,11 @@ class PlayerViewModel @JvmOverloads constructor(
 
     private var getHosterVideoLinksJob: Job? = null
 
+    private var preparingEpisodeId = -1L
+
+    @Volatile
+    private var preparedHosters: PreparedHosters? = null
+
     fun cancelHosterVideoLinksJob() {
         getHosterVideoLinksJob?.cancel()
     }
@@ -1321,11 +1405,18 @@ class PlayerViewModel @JvmOverloads constructor(
 
             try {
                 coroutineScope {
-                    hosterList.mapIndexed { hosterIdx, hoster ->
+                    val firstUsableHoster = CompletableDeferred<Unit>()
+                    val startOnFirstHoster = hosterIndex == -1 && playerPreferences.startOnFirstHoster().get()
+
+                    val hosterJobs = hosterList.mapIndexed { hosterIdx, hoster ->
                         async {
                             val hosterState = EpisodeLoader.loadHosterVideos(source, hoster)
 
                             _hosterState.updateAt(hosterIdx, hosterState)
+
+                            if (HosterLoader.selectBestVideo(_hosterState.value).first != -1) {
+                                firstUsableHoster.complete(Unit)
+                            }
 
                             if (hosterState is HosterState.Ready) {
                                 if (hosterIdx == hosterIndex) {
@@ -1357,7 +1448,30 @@ class PlayerViewModel @JvmOverloads constructor(
                                 }
                             }
                         }
-                    }.awaitAll()
+                    }
+                    val allHosters = launch { hosterJobs.awaitAll() }
+
+                    if (startOnFirstHoster) {
+                        select {
+                            firstUsableHoster.onAwait {}
+                            allHosters.onJoin {}
+                        }
+                        // A moment for the other hosters, as the list is ordered by what the source
+                        // thinks is best. Whatever turns up afterwards stays available in the sheet.
+                        withTimeoutOrNull(HOSTER_GRACE_PERIOD_MS) { allHosters.join() }
+
+                        val nothingChosenYet = selectedHosterVideoIndex.value == Pair(-1, -1)
+                        val hasUsableHoster = HosterLoader.selectBestVideo(hosterState.value).first != -1
+                        if (nothingChosenYet && hasUsableHoster && hasFoundPreferredVideo.compareAndSet(false, true)) {
+                            val (hosterIdx, videoIdx) = HosterLoader.selectBestVideo(hosterState.value)
+                            val video = (hosterState.value[hosterIdx] as HosterState.Ready).videoList[videoIdx]
+                            if (!loadVideo(source, video, hosterIdx, videoIdx)) {
+                                // Failed while others were still loading. Choose again when they're done.
+                                hasFoundPreferredVideo.set(false)
+                            }
+                        }
+                    }
+                    allHosters.join()
 
                     if (hasFoundPreferredVideo.compareAndSet(false, true)) {
                         val (hosterIdx, videoIdx) = HosterLoader.selectBestVideo(hosterState.value)
@@ -1376,6 +1490,9 @@ class PlayerViewModel @JvmOverloads constructor(
                 }
 
                 throw e
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e) { "Failed to load hosters" }
+                showPlaybackError(activity.describeError(e))
             }
         }
     }
@@ -1460,7 +1577,13 @@ class PlayerViewModel @JvmOverloads constructor(
      * Non-torrent videos are returned unchanged.
      */
     private suspend fun resolveTorrentIfNeeded(video: Video): Video? {
-        if (!isTorrentVideoUrl(video.videoUrl)) return video
+        if (!isTorrentVideoUrl(video.videoUrl)) {
+            // Either not a torrent, or one that was already resolved and is being played again.
+            torrentHash.value = TorrentServerUtils.streamHash(video.videoUrl)
+            return video
+        }
+        // Known already for a magnet, so the status can show while the server fetches its metadata.
+        torrentHash.value = video.videoUrl.substringAfter("btih:", "").substringBefore('&').ifBlank { null }
 
         // Don't log the raw URL: torrent magnets can embed private-tracker passkeys.
         logcat(LogPriority.INFO) { "[Torrent] detected torrent video, resolving via local server" }
@@ -1468,6 +1591,7 @@ class PlayerViewModel @JvmOverloads constructor(
             try {
                 if (!activity.ensureTorrentServerRunning()) {
                     logcat(LogPriority.ERROR) { "[Torrent] torrent server did not start in time" }
+                    activity.showToast(activity.stringResource(AYMR.strings.torrent_error_server))
                     return@withIOContext null
                 }
 
@@ -1477,9 +1601,19 @@ class PlayerViewModel @JvmOverloads constructor(
                     title = video.quality,
                     save = false,
                 )
-                video.copy(videoUrl = TorrentServerUtils.getTorrentPlayLink(torrent, index))
+                torrentHash.value = torrent.hash
+                video.copy(
+                    videoUrl = TorrentServerUtils.getTorrentPlayLink(torrent, index),
+                    // The server sends nothing until peers deliver the piece, which on a seek into a
+                    // poorly seeded torrent can outlast mpv's default of a minute and end playback.
+                    mpvArgs = video.mpvArgs + ("network-timeout" to TORRENT_NETWORK_TIMEOUT_SECONDS),
+                )
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: SocketTimeoutException) {
+                logcat(LogPriority.ERROR, e) { "[Torrent] no metadata in time (dead torrent)" }
+                activity.showToast(activity.stringResource(AYMR.strings.torrent_error_no_peers))
+                null
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e) { "[Torrent] failed to resolve torrent video" }
                 null
@@ -1599,6 +1733,7 @@ class PlayerViewModel @JvmOverloads constructor(
         val hosterList: List<Hoster>?,
         val episodeTitle: String,
         val source: AnimeSource,
+        val error: Throwable? = null,
     )
 
     suspend fun loadEpisode(episodeId: Long?): EpisodeLoadResult? {
@@ -1611,25 +1746,32 @@ class PlayerViewModel @JvmOverloads constructor(
         updateEpisode(chosenEpisode)
 
         return withIOContext {
+            var error: Throwable? = null
             try {
                 val currentEpisode =
                     currentEpisode.value
                         ?: throw ExceptionWithStringResource("No episode loaded", AYMR.strings.no_episode_loaded)
-                currentHosterList = EpisodeLoader.getHosters(
+                currentHosterList = takePreparedHosters(currentEpisode.id!!) ?: EpisodeLoader.getHosters(
                     currentEpisode.toDomainEpisode()!!,
                     anime,
                     source,
                 )
 
                 this@PlayerViewModel.episodeId = currentEpisode.id!!
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e) { e.message ?: "Error getting links" }
+                error = e
+                // Not the previous episode's list, which would play that episode's videos for this one.
+                currentHosterList = null
             }
 
             EpisodeLoadResult(
                 hosterList = currentHosterList,
                 episodeTitle = anime.title + " - " + chosenEpisode.name,
                 source = source,
+                error = error,
             )
         }
     }
@@ -1666,6 +1808,48 @@ class PlayerViewModel @JvmOverloads constructor(
         if (inDownloadRange) {
             downloadNextEpisodes()
         }
+
+        if (totalSeconds - seconds <= PREPARE_NEXT_EPISODE_WINDOW_MS) {
+            prepareNextEpisode()
+        }
+    }
+
+    /**
+     * Fetches the next episode's hosters ahead of autoplay, to have that much less to wait for when
+     * it starts. Once per episode, on Wi-Fi only since the user may yet stop here. Only the hoster
+     * list: video links are what tend to expire, and are still resolved when the episode starts.
+     */
+    private fun prepareNextEpisode() {
+        val nextEpisodeId = getAdjacentEpisodeId(previous = false)
+        if (nextEpisodeId == -1L || nextEpisodeId == preparingEpisodeId) return
+        if (!playerPreferences.autoplayEnabled().get() || !playerPreferences.prepareNextEpisode().get()) return
+        if (!activity.isConnectedToWifi()) return
+
+        val anime = currentAnime.value ?: return
+        val source = currentSource.value ?: return
+        val nextEpisode = currentPlaylist.value.firstOrNull { it.id == nextEpisodeId }?.toDomainEpisode() ?: return
+
+        preparingEpisodeId = nextEpisodeId
+        viewModelScope.launchIO {
+            try {
+                val hosters = EpisodeLoader.getHosters(nextEpisode, anime, source)
+                if (hosters.isNotEmpty()) {
+                    preparedHosters = PreparedHosters(nextEpisodeId, hosters, SystemClock.elapsedRealtime())
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // It's only a head start. The episode fetches them itself if it comes to that.
+                logcat(LogPriority.INFO, e) { "Couldn't prepare the next episode" }
+            }
+        }
+    }
+
+    private fun takePreparedHosters(episodeId: Long): List<Hoster>? {
+        val prepared = preparedHosters?.takeIf { it.episodeId == episodeId } ?: return null
+        preparedHosters = null
+        val age = SystemClock.elapsedRealtime() - prepared.preparedAtMs
+        return prepared.hosters.takeIf { age <= PREPARED_HOSTERS_MAX_AGE_MS }
     }
 
     private suspend fun updateEpisodeProgressOnComplete(currentEp: Episode) {
@@ -2171,3 +2355,23 @@ fun CustomButton.executeLongPress() {
 fun Float.normalize(inMin: Float, inMax: Float, outMin: Float, outMax: Float): Float {
     return (this - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
 }
+
+/**
+ * @property bytesPerSecond how fast mpv's cache is filling.
+ * @property bufferingPercent how far along mpv is to resuming, when it paused to buffer.
+ * @property torrent state of the torrent being played, if any.
+ */
+@Immutable
+data class PlayerLoadingStatus(
+    val bytesPerSecond: Long,
+    val bufferingPercent: Int,
+    val torrent: TorrentLoadStatus?,
+)
+
+private class PreparedHosters(val episodeId: Long, val hosters: List<Hoster>, val preparedAtMs: Long)
+
+private const val HOSTER_GRACE_PERIOD_MS = 2_000L
+private const val PREPARE_NEXT_EPISODE_WINDOW_MS = 2 * 60_000L
+private const val PREPARED_HOSTERS_MAX_AGE_MS = 10 * 60_000L
+private const val TORRENT_STATUS_INTERVAL_MS = 1_500L
+private const val TORRENT_NETWORK_TIMEOUT_SECONDS = "180"

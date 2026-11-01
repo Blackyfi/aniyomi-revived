@@ -3,28 +3,39 @@ package eu.kanade.tachiyomi.ui.reader.viewer.pager
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.databinding.ReaderErrorBinding
 import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.torrentServer.TorrentServerUtils
+import eu.kanade.tachiyomi.torrentServer.model.TorrentLoadStatus
 import eu.kanade.tachiyomi.ui.reader.model.InsertPage
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
+import eu.kanade.tachiyomi.util.system.dpToPx
+import eu.kanade.tachiyomi.util.torrentStatusText
 import eu.kanade.tachiyomi.widget.ViewPagerAdapter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
 import okio.Buffer
 import okio.BufferedSource
+import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
+import tachiyomi.i18n.aniyomi.AYMR
 
 /**
  * View of the ViewPager that contains a page of a chapter.
@@ -52,6 +63,11 @@ class PagerPageHolder(
      */
     private var errorLayout: ReaderErrorBinding? = null
 
+    /**
+     * Line under the progress indicator for pages coming from a torrent, which can take a while.
+     */
+    private var torrentStatusView: TextView? = null
+
     private val scope = MainScope()
 
     /**
@@ -71,6 +87,22 @@ class PagerPageHolder(
         super.onDetachedFromWindow()
         loadJob?.cancel()
         loadJob = null
+    }
+
+    private fun showTorrentStatus(status: TorrentLoadStatus?) {
+        if (status == null || status.dead) {
+            torrentStatusView?.isVisible = false
+            return
+        }
+        val view = torrentStatusView ?: (
+            LayoutInflater.from(context).inflate(R.layout.reader_torrent_status, this, false) as TextView
+            ).also {
+            it.updateLayoutParams<ViewGroup.MarginLayoutParams> { topMargin = TORRENT_STATUS_OFFSET_DP.dpToPx }
+            addView(it)
+            torrentStatusView = it
+        }
+        view.text = context.torrentStatusText(status)
+        view.isVisible = true
     }
 
     private fun initProgressIndicator() {
@@ -100,8 +132,11 @@ class PagerPageHolder(
                     Page.State.LOAD_PAGE -> setLoading()
                     Page.State.DOWNLOAD_IMAGE -> {
                         setDownloading()
-                        page.progressFlow.collectLatest { value ->
-                            progressIndicator?.setProgress(value)
+                        coroutineScope {
+                            launch { page.torrentStatus.collect(::showTorrentStatus) }
+                            page.progressFlow.collectLatest { value ->
+                                progressIndicator?.setProgress(value)
+                            }
                         }
                     }
                     Page.State.READY -> setImage()
@@ -115,6 +150,7 @@ class PagerPageHolder(
      * Called when the page is queued.
      */
     private fun setQueued() {
+        showTorrentStatus(null)
         initProgressIndicator()
         progressIndicator?.show()
         removeErrorLayout()
@@ -142,6 +178,7 @@ class PagerPageHolder(
      * Called when the page is ready.
      */
     private suspend fun setImage() {
+        showTorrentStatus(null)
         progressIndicator?.setProgress(0)
 
         val streamFn = page.stream ?: return
@@ -243,6 +280,7 @@ class PagerPageHolder(
      * Called when the page has an error.
      */
     private fun setError() {
+        showTorrentStatus(null)
         progressIndicator?.hide()
         showErrorLayout()
     }
@@ -277,8 +315,14 @@ class PagerPageHolder(
             }
         }
 
+        if (page.torrentStatus.value?.dead == true) {
+            errorLayout?.errorMessage?.text = context.stringResource(AYMR.strings.torrent_error_no_peers)
+        }
+
         val imageUrl = page.imageUrl
-        errorLayout?.actionOpenInWebView?.isVisible = imageUrl != null
+        errorLayout?.actionOpenInWebView?.isVisible =
+            imageUrl != null &&
+            TorrentServerUtils.streamHash(imageUrl) == null
         if (imageUrl != null) {
             if (imageUrl.startsWith("http", true)) {
                 errorLayout?.actionOpenInWebView?.viewer = viewer
@@ -297,7 +341,12 @@ class PagerPageHolder(
      * Removes the decode error layout from the holder, if found.
      */
     private fun removeErrorLayout() {
-        errorLayout?.root?.isVisible = false
-        errorLayout = null
+        errorLayout?.let {
+            removeView(it.root)
+            errorLayout = null
+        }
     }
 }
+
+/** Clears the progress indicator, which is centered in the same frame. */
+private const val TORRENT_STATUS_OFFSET_DP = 64
