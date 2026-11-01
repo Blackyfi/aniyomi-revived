@@ -37,10 +37,7 @@ class NetworkHelper(
             .addNetworkInterceptor(BrotliInterceptor)
 
         if (preferences.verboseLogging().get()) {
-            val httpLoggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.HEADERS
-            }
-            builder.addNetworkInterceptor(httpLoggingInterceptor)
+            builder.addNetworkInterceptor(verboseHttpLoggingInterceptor())
         }
 
         when (preferences.dohProvider().get()) {
@@ -77,4 +74,43 @@ class NetworkHelper(
     val cloudflareClient: OkHttpClient = client
 
     fun defaultUserAgentProvider() = preferences.defaultUserAgent().get().trim()
+}
+
+private val SENSITIVE_HEADERS = listOf(
+    "Authorization",
+    "Proxy-Authorization",
+    "Cookie",
+    "Set-Cookie",
+    "X-Api-Key",
+    "X-Auth-Token",
+    "X-Emby-Token",
+    "X-MediaBrowser-Token",
+)
+
+private val SENSITIVE_QUERY_PARAMS = arrayOf(
+    "access_token",
+    "api_key",
+    "apikey",
+    "auth",
+    "code",
+    "key",
+    "pass",
+    "passkey",
+    "password",
+    "refresh_token",
+    "token",
+)
+
+/**
+ * HTTP logging for the "verbose logging" setting. The log ends up in crash reports that users share
+ * publicly, so credentials are kept out of it.
+ */
+internal fun verboseHttpLoggingInterceptor(
+    logger: HttpLoggingInterceptor.Logger = HttpLoggingInterceptor.Logger.DEFAULT,
+): HttpLoggingInterceptor {
+    return HttpLoggingInterceptor(logger).apply {
+        level = HttpLoggingInterceptor.Level.HEADERS
+        SENSITIVE_HEADERS.forEach(::redactHeader)
+        redactQueryParams(*SENSITIVE_QUERY_PARAMS)
+    }
 }
