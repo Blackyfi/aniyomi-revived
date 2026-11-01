@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -82,6 +83,7 @@ import eu.kanade.tachiyomi.util.torrentStatusText
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
@@ -109,7 +111,14 @@ fun PlayerControls(
     val controlsShown by viewModel.controlsShown.collectAsState()
     val areControlsLocked by viewModel.areControlsLocked.collectAsState()
     val seekBarShown by viewModel.seekBarShown.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val isLoading by produceState(false, viewModel) {
+        // Most seeks land within the cache. Waiting a moment keeps those from flashing the spinner
+        // and hiding the play button, and costs a real stall little.
+        viewModel.isLoading.collectLatest { loading ->
+            if (loading) delay(LOADING_INDICATOR_DELAY_MS)
+            value = loading
+        }
+    }
     val isLoadingEpisode by viewModel.isLoadingEpisode.collectAsState()
     val duration by viewModel.duration.collectAsState()
     val position by viewModel.pos.collectAsState()
@@ -661,6 +670,8 @@ fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> = tween(
     durationMillis = 100,
     easing = LinearOutSlowInEasing,
 )
+
+private const val LOADING_INDICATOR_DELAY_MS = 400L
 
 private fun loadingStatusText(context: Context, status: PlayerLoadingStatus): String? {
     status.torrent?.let { return context.torrentStatusText(it) }
