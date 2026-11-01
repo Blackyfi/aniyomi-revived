@@ -90,8 +90,6 @@ class MangaExtensionManager(
         context.doOnTrimMemoryBackground { iconMap.clear() }
     }
 
-    private var subLanguagesEnabledOnFirstRun = preferences.enabledLanguages().isSet()
-
     /**
      * Blocks until the initial scan has finished, for the few synchronous lookups that have to
      * answer from the complete list. The timeout only guards against a hung extension.
@@ -203,7 +201,7 @@ class MangaExtensionManager(
      * the new languages will not be added to respect the user enabled choices.
      */
     private fun enableAdditionalSubLanguages(extensions: List<MangaExtension.Available>) {
-        if (subLanguagesEnabledOnFirstRun || extensions.isEmpty()) {
+        if (preferences.enabledLanguages().isSet() || extensions.isEmpty()) {
             return
         }
 
@@ -220,7 +218,6 @@ class MangaExtensionManager(
         }
 
         preferences.enabledLanguages().set(defaultLanguages + languagesToEnable)
-        subLanguagesEnabledOnFirstRun = true
     }
 
     /**
