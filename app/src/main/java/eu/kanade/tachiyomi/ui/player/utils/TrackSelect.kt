@@ -36,9 +36,11 @@ class TrackSelect(
         }.split(",").filter(String::isNotEmpty).map(String::trim)
 
         val deviceLocale = LocaleListCompat.getDefault()[0]!!
-        // A preferred language set for the player always wins over the content language
+        // A preferred language set for the player always wins over the content language.
+        // Audio keeps the device language: reading a language doesn't mean wanting its dub.
         val locales = prefLangs.map(::Locale)
             .ifEmpty {
+                if (!subtitle) return@ifEmpty emptyList()
                 ContentLanguages.playerLanguages(
                     sourcePreferences.contentLanguageSelection().get(),
                     deviceLocale.language,
