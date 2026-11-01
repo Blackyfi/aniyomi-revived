@@ -24,12 +24,14 @@ object TrackerOAuthState {
     }
 
     /**
-     * Returns true only if [returnedState] matches the pending state. The pending state is
-     * cleared regardless so it can't be replayed.
+     * Returns true only if [returnedState] matches the pending state, which is then cleared so it
+     * can't be replayed. A mismatch keeps it: otherwise any stray callback would invalidate the
+     * login the user is in the middle of.
      */
     fun consumeAndValidate(returnedState: String?): Boolean {
         val expected = trackPreferences.trackAuthState().get()
+        if (expected.isEmpty() || expected != returnedState) return false
         trackPreferences.trackAuthState().delete()
-        return expected.isNotEmpty() && expected == returnedState
+        return true
     }
 }
