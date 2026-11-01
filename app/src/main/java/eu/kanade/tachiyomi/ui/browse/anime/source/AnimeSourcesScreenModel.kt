@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.source.ContentLanguages
 import eu.kanade.domain.source.anime.interactor.GetEnabledAnimeSources
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeSource
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeSourcePin
@@ -17,6 +18,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import logcat.LogPriority
@@ -24,6 +26,7 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.source.anime.model.AnimeSource
 import tachiyomi.domain.source.anime.model.Pin
+import tachiyomi.domain.source.anime.repository.AnimeSourceRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.TreeMap
@@ -31,6 +34,7 @@ import java.util.TreeMap
 class AnimeSourcesScreenModel(
     private val preferences: BasePreferences = Injekt.get(),
     private val sourcePreferences: SourcePreferences = Injekt.get(),
+    private val sourceRepository: AnimeSourceRepository = Injekt.get(),
     private val getEnabledAnimeSources: GetEnabledAnimeSources = Injekt.get(),
     private val toggleSource: ToggleAnimeSource = Injekt.get(),
     private val toggleSourcePin: ToggleAnimeSourcePin = Injekt.get(),
@@ -40,6 +44,17 @@ class AnimeSourcesScreenModel(
     val events = _events.receiveAsFlow()
 
     init {
+        screenModelScope.launchIO {
+            combine(
+                sourcePreferences.contentLanguageSelection().changes(),
+                sourcePreferences.enabledLanguages().changes(),
+                sourceRepository.getOnlineAnimeSources(),
+            ) { selection, enabled, sources ->
+                ContentLanguages.hiddenSourceCount(selection, enabled, sources) { it.lang }
+            }
+                .catch { logcat(LogPriority.ERROR, it) }
+                .collectLatest { count -> mutableState.update { it.copy(hiddenByLanguage = count) } }
+        }
         screenModelScope.launchIO {
             getEnabledAnimeSources.subscribe()
                 .catch {
@@ -114,6 +129,7 @@ class AnimeSourcesScreenModel(
     data class State(
         val dialog: Dialog? = null,
         val isLoading: Boolean = true,
+        val hiddenByLanguage: Int = 0,
         val items: ImmutableList<AnimeSourceUiModel> = persistentListOf(),
     ) {
         val isEmpty = items.isEmpty()
