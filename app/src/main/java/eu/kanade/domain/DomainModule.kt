@@ -409,6 +409,6 @@ class DomainModule : InjektModule {
         addFactory { ReorderCustomButton(get()) }
         addFactory { ToggleFavoriteCustomButton(get()) }
 
-        addFactory { TrackSelect(get(), get()) }
+        addFactory { TrackSelect(get(), get(), get()) }
     }
 }
