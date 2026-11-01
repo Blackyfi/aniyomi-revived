@@ -30,6 +30,8 @@ import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.DecoderPreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
+import eu.kanade.tachiyomi.util.system.DeviceTier
+import eu.kanade.tachiyomi.util.system.DeviceUtil
 import `is`.xyz.mpv.BaseMPVView
 import `is`.xyz.mpv.KeyMapping
 import `is`.xyz.mpv.MPVLib
@@ -135,9 +137,14 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         MPVLib.setOptionString("tls-ca-file", "${context.filesDir.path}/${PlayerActivity.MPV_DIR}/cacert.pem")
 
         // Limit demuxer cache since the defaults are too high for mobile devices
-        val cacheMegs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) 64 else 32
-        MPVLib.setOptionString("demuxer-max-bytes", "${cacheMegs * 1024 * 1024}")
-        MPVLib.setOptionString("demuxer-max-back-bytes", "${cacheMegs * 1024 * 1024}")
+        val maxCacheMegs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) 64 else 32
+        val (forwardMegs, backMegs) = when (DeviceUtil.deviceTier(context)) {
+            DeviceTier.LOW -> 32 to 16
+            DeviceTier.AVERAGE -> 64 to 32
+            DeviceTier.HIGH -> 64 to 64
+        }
+        MPVLib.setOptionString("demuxer-max-bytes", "${minOf(forwardMegs, maxCacheMegs) * 1024 * 1024}")
+        MPVLib.setOptionString("demuxer-max-back-bytes", "${minOf(backMegs, maxCacheMegs) * 1024 * 1024}")
         //
         val screenshotDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
         screenshotDir.mkdirs()
