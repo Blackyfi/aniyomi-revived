@@ -2,11 +2,14 @@ package eu.kanade.tachiyomi.ui.download.manga
 
 import android.view.View
 import androidx.recyclerview.widget.ItemTouchHelper
+import com.google.android.material.color.MaterialColors
 import eu.davidea.viewholders.FlexibleViewHolder
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.databinding.DownloadItemBinding
 import eu.kanade.tachiyomi.util.view.popupMenu
+import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.i18n.MR
 
 /**
  * Class used to hold the data of a download.
@@ -19,6 +22,7 @@ class MangaDownloadHolder(private val view: View, val adapter: MangaDownloadAdap
     FlexibleViewHolder(view, adapter) {
 
     private val binding = DownloadItemBinding.bind(view)
+    private val defaultProgressTextColor = binding.downloadProgressText.textColors
 
     init {
         setDragHandleView(binding.reorder)
@@ -49,6 +53,28 @@ class MangaDownloadHolder(private val view: View, val adapter: MangaDownloadAdap
         } else {
             binding.downloadProgress.max = pages.size * 100
             notifyProgress()
+            notifyDownloadedPages()
+        }
+        notifyStatus()
+    }
+
+    /**
+     * Marks a failed download, which otherwise looks the same as one still waiting.
+     */
+    fun notifyStatus() {
+        val failed = download.status == MangaDownload.State.ERROR
+        if (failed) {
+            binding.downloadProgressText.setTextColor(
+                MaterialColors.getColor(view, com.google.android.material.R.attr.colorError),
+            )
+        } else {
+            binding.downloadProgressText.setTextColor(defaultProgressTextColor)
+        }
+        if (failed) {
+            binding.downloadProgressText.text = view.context.stringResource(MR.strings.chapter_error)
+        } else if (download.pages == null) {
+            binding.downloadProgressText.text = ""
+        } else {
             notifyDownloadedPages()
         }
     }

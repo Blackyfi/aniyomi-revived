@@ -194,7 +194,12 @@ class AnimeDownloadQueueScreenModel(
                 onUpdateProgress(download)
                 onUpdateDownloadedPages(download)
             }
-            AnimeDownload.State.ERROR -> cancelProgressJob(download)
+            AnimeDownload.State.ERROR -> {
+                cancelProgressJob(download)
+                getHolder(download)?.notifyStatus()
+            }
+            // A failed download going back in the queue after resuming
+            AnimeDownload.State.QUEUE -> getHolder(download)?.notifyStatus()
             else -> {
                 /* unused */
             }
