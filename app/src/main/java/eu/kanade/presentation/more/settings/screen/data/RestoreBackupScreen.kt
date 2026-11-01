@@ -145,6 +145,13 @@ class RestoreBackupScreen(
                                         prefix = "- ",
                                     )
                                 }
+                                if (error.hasPlayerScripts) {
+                                    appendLine()
+                                    appendLine()
+                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        appendLine(stringResource(MR.strings.backup_restore_player_scripts))
+                                    }
+                                }
                             }
 
                             is InvalidRestore -> {
@@ -213,9 +220,14 @@ private class RestoreBackupScreenModel(
             return
         }
 
-        if (results.missingSources.isNotEmpty() || results.missingTrackers.isNotEmpty()) {
+        if (results.missingSources.isNotEmpty() || results.missingTrackers.isNotEmpty() || results.hasPlayerScripts) {
             setError(
-                error = MissingRestoreComponents(uri, results.missingSources, results.missingTrackers),
+                error = MissingRestoreComponents(
+                    uri,
+                    results.missingSources,
+                    results.missingTrackers,
+                    results.hasPlayerScripts,
+                ),
                 canRestore = true,
             )
             return
@@ -247,6 +259,7 @@ private data class MissingRestoreComponents(
     val uri: Uri,
     val sources: List<String>,
     val trackers: List<String>,
+    val hasPlayerScripts: Boolean,
 )
 
 private data class InvalidRestore(

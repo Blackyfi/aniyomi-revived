@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup
 
 import android.content.Context
 import android.net.Uri
+import eu.kanade.tachiyomi.data.backup.models.StringPreferenceValue
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import tachiyomi.domain.source.manga.service.MangaSourceManager
@@ -67,11 +68,21 @@ class BackupFileValidator(
             .map { it.name }
             .sorted()
 
-        return Results(missingSources, missingTrackers)
+        val hasPlayerScripts = backup.backupCustomButton.isNotEmpty() ||
+            backup.backupPreferences.any { pref ->
+                pref.key in PLAYER_SCRIPT_KEYS && (pref.value as? StringPreferenceValue)?.value?.isNotBlank() == true
+            }
+
+        return Results(missingSources, missingTrackers, hasPlayerScripts)
     }
 
     data class Results(
         val missingSources: List<String>,
         val missingTrackers: List<String>,
+        val hasPlayerScripts: Boolean,
     )
+
+    private companion object {
+        val PLAYER_SCRIPT_KEYS = setOf("pref_mpv_conf", "pref_mpv_input")
+    }
 }
