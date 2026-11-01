@@ -18,6 +18,7 @@ import eu.kanade.tachiyomi.source.SourceFactory
 import eu.kanade.tachiyomi.util.lang.Hash
 import eu.kanade.tachiyomi.util.storage.copyAndSetReadOnlyTo
 import eu.kanade.tachiyomi.util.system.ChildFirstPathClassLoader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -49,6 +50,7 @@ internal object MangaExtensionLoader {
         preferences.showNsfwSource().get()
     }
 
+    private const val LOAD_PARALLELISM = 4
     private const val EXTENSION_FEATURE = "tachiyomi.extension"
     private const val METADATA_SOURCE_CLASS = "tachiyomi.extension.class"
     private const val METADATA_SOURCE_FACTORY = "tachiyomi.extension.factory"
@@ -173,10 +175,12 @@ internal object MangaExtensionLoader {
 
         if (extPkgs.isEmpty()) return emptyList()
 
-        // Load each extension concurrently and wait for completion
+        // Load each extension concurrently and wait for completion. Most of the work is blocking
+        // class loading, so it needs threads of its own to actually run concurrently.
+        val dispatcher = Dispatchers.IO.limitedParallelism(LOAD_PARALLELISM)
         return runBlocking {
             val deferred = extPkgs.map {
-                async { loadMangaExtension(context, it) }
+                async(dispatcher) { loadMangaExtension(context, it) }
             }
             deferred.awaitAll()
         }
