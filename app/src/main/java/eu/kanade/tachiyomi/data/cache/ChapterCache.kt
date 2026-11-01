@@ -153,7 +153,6 @@ class ChapterCache(
             // Get OutputStream and write image with Okio.
             response.body.source().saveTo(editor.newOutputStream(0))
 
-            diskCache.flush()
             editor.commit()
         } finally {
             response.body.close()
