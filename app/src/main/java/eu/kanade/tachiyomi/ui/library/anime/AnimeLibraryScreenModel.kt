@@ -21,12 +21,13 @@ import eu.kanade.presentation.components.SEARCH_DEBOUNCE_MILLIS
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.tachiyomi.animesource.model.SAnime
-import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.track.TrackerManager
+import eu.kanade.tachiyomi.ui.library.itemsBetween
+import eu.kanade.tachiyomi.ui.library.meanTrackerScore
 import eu.kanade.tachiyomi.ui.main.whileMainUiVisible
 import eu.kanade.tachiyomi.util.episode.getNextUnseen
 import eu.kanade.tachiyomi.util.removeBackgrounds
@@ -36,6 +37,7 @@ import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -47,6 +49,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.core.common.preference.TriState
@@ -63,7 +66,9 @@ import tachiyomi.domain.entries.anime.model.AnimeUpdate
 import tachiyomi.domain.entries.applyFilter
 import tachiyomi.domain.history.anime.interactor.GetNextEpisodes
 import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
+import tachiyomi.domain.items.episode.interactor.UpdateEpisode
 import tachiyomi.domain.items.episode.model.Episode
+import tachiyomi.domain.items.episode.model.EpisodeUpdate
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.library.anime.model.AnimeLibrarySort
 import tachiyomi.domain.library.anime.model.sort
@@ -89,6 +94,7 @@ class AnimeLibraryScreenModel(
     private val getNextEpisodes: GetNextEpisodes = Injekt.get(),
     private val getEpisodesByAnimeId: GetEpisodesByAnimeId = Injekt.get(),
     private val setSeenStatus: SetSeenStatus = Injekt.get(),
+    private val updateEpisode: UpdateEpisode = Injekt.get(),
     private val updateAnime: UpdateAnime = Injekt.get(),
     private val setAnimeCategories: SetAnimeCategories = Injekt.get(),
     private val preferences: BasePreferences = Injekt.get(),
@@ -100,6 +106,9 @@ class AnimeLibraryScreenModel(
     private val downloadCache: AnimeDownloadCache = Injekt.get(),
     private val trackerManager: TrackerManager = Injekt.get(),
 ) : StateScreenModel<AnimeLibraryScreenModel.State>(State()) {
+
+    private val _events = Channel<Event>(Channel.UNLIMITED)
+    val events = _events.receiveAsFlow()
 
     var activeCategoryIndex: Int by libraryPreferences.lastUsedAnimeCategory().asState(
         screenModelScope,
@@ -171,6 +180,12 @@ class AnimeLibraryScreenModel(
                 mutableState.update { state ->
                     state.copy(hasActiveFilters = it)
                 }
+            }
+            .launchIn(screenModelScope)
+
+        preferences.downloadedOnly().changes()
+            .onEach { downloadedOnly ->
+                mutableState.update { it.copy(downloadedOnly = downloadedOnly) }
             }
             .launchIn(screenModelScope)
     }
@@ -269,7 +284,7 @@ class AnimeLibraryScreenModel(
                     else ->
                         entry.value
                             .mapNotNull { trackerMap[it.trackerId]?.animeService?.get10PointScore(it) }
-                            .average()
+                            .let(::meanTrackerScore)
                 }
             }
         }
@@ -480,6 +495,7 @@ class AnimeLibraryScreenModel(
      */
     private fun downloadUnseenEpisodes(animes: List<Anime>, amount: Int?) {
         screenModelScope.launchNonCancellable {
+            var queued = 0
             animes.forEach { anime ->
                 val episodes = getNextEpisodes.await(anime.id)
                     .fastFilterNot { episode ->
@@ -494,7 +510,9 @@ class AnimeLibraryScreenModel(
                     .let { if (amount != null) it.take(amount) else it }
 
                 downloadManager.downloadEpisodes(anime, episodes)
+                queued += episodes.size
             }
+            _events.trySend(Event.DownloadsQueued(queued))
         }
     }
 
@@ -504,14 +522,23 @@ class AnimeLibraryScreenModel(
     fun markSeenSelection(seen: Boolean) {
         val animes = state.value.selection.toList()
         screenModelScope.launchNonCancellable {
+            val previous = animes
+                .flatMap { getEpisodesByAnimeId.await(it.anime.id) }
+                .filter { if (seen) !it.seen else it.seen || it.lastSecondSeen > 0 }
+                .map { EpisodeUpdate(id = it.id, seen = it.seen, lastSecondSeen = it.lastSecondSeen) }
             animes.forEach { anime ->
                 setSeenStatus.await(
                     anime = anime.anime,
                     seen = seen,
                 )
             }
+            if (previous.isNotEmpty()) _events.trySend(Event.MarkedSeen(seen, animes.size, previous))
         }
         clearSelection()
+    }
+
+    fun undoMarkSeen(previous: List<EpisodeUpdate>) {
+        screenModelScope.launchNonCancellable { updateEpisode.awaitAll(previous) }
     }
 
     /**
@@ -526,24 +553,35 @@ class AnimeLibraryScreenModel(
             val animeToDelete = animeList.distinctBy { it.id }
 
             if (deleteFromLibrary) {
-                val toDelete = animeToDelete.map {
-                    it.removeCovers(coverCache)
-                    it.removeBackgrounds(backgroundCache)
-                    AnimeUpdate(
-                        favorite = false,
-                        id = it.id,
-                    )
-                }
-                updateAnime.awaitAll(toDelete)
+                updateAnime.awaitAll(animeToDelete.map { AnimeUpdate(favorite = false, id = it.id) })
             }
 
             if (deleteEpisodes) {
                 animeToDelete.forEach { anime ->
-                    val source = sourceManager.get(anime.source) as? AnimeHttpSource
-                    if (source != null) {
-                        downloadManager.deleteAnime(anime, source)
-                    }
+                    // A stub still resolves the folder when the extension has been uninstalled
+                    downloadManager.deleteAnime(anime, sourceManager.getOrStub(anime.source))
                 }
+            }
+
+            if (deleteFromLibrary) _events.trySend(Event.Removed(animeToDelete))
+        }
+    }
+
+    fun undoRemove(animeList: List<Anime>) {
+        screenModelScope.launchNonCancellable {
+            updateAnime.awaitAll(animeList.map { AnimeUpdate(favorite = true, id = it.id) })
+        }
+    }
+
+    /**
+     * Drops the images of removed entries once the removal can no longer be undone, because this
+     * also deletes custom covers.
+     */
+    fun finishRemove(animeList: List<Anime>) {
+        screenModelScope.launchNonCancellable {
+            animeList.forEach {
+                it.removeCovers(coverCache)
+                it.removeBackgrounds(backgroundCache)
             }
         }
     }
@@ -590,13 +628,29 @@ class AnimeLibraryScreenModel(
     }
 
     suspend fun getRandomAnimelibItemForCurrentCategory(): AnimeLibraryItem? {
-        if (state.value.categories.isEmpty()) return null
+        val category = state.value.categories.getOrNull(activeCategoryIndex) ?: return null
 
         return withIOContext {
             state.value
-                .getAnimelibItemsByCategoryId(state.value.categories[activeCategoryIndex].id)
+                .getAnimelibItemsByCategoryId(category.id)
                 ?.randomOrNull()
         }
+    }
+
+    fun resetFilters() {
+        libraryPreferences.filterDownloadedAnime().set(TriState.DISABLED)
+        libraryPreferences.filterUnseen().set(TriState.DISABLED)
+        libraryPreferences.filterStartedAnime().set(TriState.DISABLED)
+        libraryPreferences.filterBookmarkedAnime().set(TriState.DISABLED)
+        libraryPreferences.filterCompletedAnime().set(TriState.DISABLED)
+        libraryPreferences.filterIntervalCustom().set(TriState.DISABLED)
+        trackerManager.loggedInTrackers().forEach {
+            libraryPreferences.filterTrackedAnime(it.id.toInt()).set(TriState.DISABLED)
+        }
+    }
+
+    fun showAllEntries() {
+        preferences.downloadedOnly().set(false)
     }
 
     fun showSettingsDialog() {
@@ -635,19 +689,9 @@ class AnimeLibraryScreenModel(
 
                 val items = state.getAnimelibItemsByCategoryId(anime.category)
                     ?.fastMap { it.libraryAnime }.orEmpty()
-                val lastAnimeIndex = items.indexOf(lastSelected)
-                val curAnimeIndex = items.indexOf(anime)
-
                 val selectedIds = list.fastMap { it.id }
-                val selectionRange = when {
-                    lastAnimeIndex < curAnimeIndex -> IntRange(lastAnimeIndex, curAnimeIndex)
-                    curAnimeIndex < lastAnimeIndex -> IntRange(curAnimeIndex, lastAnimeIndex)
-                    // We shouldn't reach this point
-                    else -> return@mutate
-                }
-                val newSelections = selectionRange.mapNotNull { index ->
-                    items[index].takeUnless { it.id in selectedIds }
-                }
+                val newSelections = itemsBetween(items, { it.id }, lastSelected.id, anime.id)
+                    .filterNot { it.id in selectedIds }
                 list.addAll(newSelections)
             }
             state.copy(selection = newSelection)
@@ -672,7 +716,7 @@ class AnimeLibraryScreenModel(
     fun invertSelection(index: Int) {
         mutableState.update { state ->
             val newSelection = state.selection.mutate { list ->
-                val categoryId = state.categories[index].id
+                val categoryId = state.categories.getOrNull(index)?.id ?: return@mutate
                 val items = state.getAnimelibItemsByCategoryId(categoryId)?.fastMap { it.libraryAnime }.orEmpty()
                 val selectedIds = list.fastMap { it.id }
                 val (toRemove, toAdd) = items.fastPartition { it.id in selectedIds }
@@ -735,6 +779,12 @@ class AnimeLibraryScreenModel(
         data class DeleteAnime(val anime: List<Anime>) : Dialog
     }
 
+    sealed interface Event {
+        data class MarkedSeen(val seen: Boolean, val entries: Int, val previous: List<EpisodeUpdate>) : Event
+        data class Removed(val animeList: List<Anime>) : Event
+        data class DownloadsQueued(val count: Int) : Event
+    }
+
     @Immutable
     private data class ItemPreferences(
         val downloadBadge: Boolean,
@@ -759,6 +809,7 @@ class AnimeLibraryScreenModel(
         val searchQuery: String? = null,
         val selection: PersistentList<LibraryAnime> = persistentListOf(),
         val hasActiveFilters: Boolean = false,
+        val downloadedOnly: Boolean = false,
         val showCategoryTabs: Boolean = false,
         val showAnimeCount: Boolean = false,
         val showAnimeContinueButton: Boolean = false,

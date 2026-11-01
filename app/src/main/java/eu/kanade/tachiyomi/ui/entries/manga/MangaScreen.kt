@@ -54,7 +54,6 @@ import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearch
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.manga.track.MangaTrackInfoDialogHomeScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
-import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
@@ -67,6 +66,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.model.MangaType
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
@@ -164,11 +164,15 @@ class MangaScreen(
                     screenModel.showTrackDialog()
                 }
             },
-            onTagSearch = { scope.launch { performGenreSearch(navigator, it, screenModel.source!!) } },
+            onTagSearch = {
+                scope.launch { performGenreSearch(navigator, it, screenModel.source!!, successState.manga) }
+            },
             onFilterButtonClicked = screenModel::showSettingsDialog,
             onRefresh = screenModel::fetchAllFromSource,
             onContinueReading = { continueReading(context, screenModel.getNextUnreadChapter()) },
-            onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
+            onSearch = { query, global ->
+                scope.launch { performSearch(navigator, query, global, successState.manga) }
+            },
             onSourceSelected = { key: String -> screenModel.switchSource(key) }
                 .takeIf { successState.source is MultiSourceCatalogSource },
             onPickerOpened = screenModel::warmSourcePrefetch,
@@ -387,25 +391,27 @@ class MangaScreen(
      *
      * @param query the search query to the parent controller
      */
-    private suspend fun performSearch(navigator: Navigator, query: String, global: Boolean) {
-        if (global) {
-            navigator.push(GlobalMangaSearchScreen(query))
-            return
-        }
-
-        if (navigator.size < 2) {
-            return
-        }
-
-        when (val previousController = navigator.items[navigator.size - 2]) {
-            is HomeScreen -> {
+    private suspend fun performSearch(navigator: Navigator, query: String, global: Boolean, manga: Manga) {
+        val previousController = navigator.items.getOrNull(navigator.size - 2)
+        when {
+            global -> navigator.push(GlobalMangaSearchScreen(query))
+            previousController is HomeScreen -> {
                 navigator.pop()
-                MangaLibraryTab.search(query)
+                HomeScreen.search(
+                    if (manga.mangaType == MangaType.MANHWA) {
+                        HomeScreen.LibraryTarget.MANHWA
+                    } else {
+                        HomeScreen.LibraryTarget.MANGA
+                    },
+                    query,
+                )
             }
-            is BrowseMangaSourceScreen -> {
+            previousController is BrowseMangaSourceScreen -> {
                 navigator.pop()
                 previousController.search(query)
             }
+            // Opened from somewhere with nothing to search in, like a deep link or global search
+            else -> navigator.push(GlobalMangaSearchScreen(query))
         }
     }
 
@@ -418,17 +424,14 @@ class MangaScreen(
         navigator: Navigator,
         genreName: String,
         source: MangaSource,
+        manga: Manga,
     ) {
-        if (navigator.size < 2) {
-            return
-        }
-
-        val previousController = navigator.items[navigator.size - 2]
+        val previousController = navigator.items.getOrNull(navigator.size - 2)
         if (previousController is BrowseMangaSourceScreen && source is HttpSource) {
             navigator.pop()
             previousController.searchGenre(genreName)
         } else {
-            performSearch(navigator, genreName, global = false)
+            performSearch(navigator, genreName, global = false, manga)
         }
     }
 

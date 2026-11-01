@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +34,7 @@ import eu.kanade.tachiyomi.data.backup.BackupFileValidator
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import eu.kanade.tachiyomi.util.system.DeviceUtil
+import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.flow.update
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.i18n.MR
@@ -68,12 +71,19 @@ class RestoreBackupScreen(
                 actionEnabled = state.canRestore && state.options.canRestore(),
                 onClickAction = {
                     model.startRestore()
+                    context.toast(MR.strings.restoring_backup)
                     navigator.pop()
                 },
             ) {
                 if (DeviceUtil.isMiui && DeviceUtil.isMiuiOptimizationDisabled()) {
                     item {
                         WarningBanner(MR.strings.restore_miui_warning)
+                    }
+                }
+
+                if (state.isValidating) {
+                    item {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                 }
 
@@ -217,6 +227,7 @@ private class RestoreBackupScreenModel(
     private fun setError(error: Any?, canRestore: Boolean) {
         mutableState.update {
             it.copy(
+                isValidating = false,
                 error = error,
                 canRestore = canRestore,
             )
@@ -225,6 +236,7 @@ private class RestoreBackupScreenModel(
 
     @Immutable
     data class State(
+        val isValidating: Boolean = true,
         val error: Any? = null,
         val canRestore: Boolean = false,
         val options: RestoreOptions = RestoreOptions(),
