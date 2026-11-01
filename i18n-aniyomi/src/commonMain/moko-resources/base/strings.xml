@@ -680,4 +680,8 @@
     <string name="library_downloaded_only_empty">Nothing downloaded here. Downloaded only is hiding the rest of your library.</string>
     <string name="action_show_all_entries">Show everything</string>
     <string name="action_reset_filters">Reset filters</string>
+    <string name="pref_content_language">Content language</string>
+    <string name="pref_content_language_description">Only extensions and sources in these languages are offered, for both manga and anime, in browse, global search and migration. Multi-language sources stay listed. Your library and installed extensions aren\'t affected. Chapters and episodes inside a source aren\'t filtered. The player also prefers these languages for audio and subtitles, unless you set your own in the player settings.</string>
+    <string name="content_language_all">All languages</string>
+    <string name="content_language_hidden_action">Choose what to show</string>
 </resources>

@@ -93,8 +93,6 @@ class AnimeExtensionManager(
         context.doOnTrimMemoryBackground { iconMap.clear() }
     }
 
-    private var subLanguagesEnabledOnFirstRun = preferences.enabledLanguages().isSet()
-
     /**
      * Blocks until the initial scan has finished, for the few synchronous lookups that have to
      * answer from the complete list. The timeout only guards against a hung extension.
@@ -208,7 +206,7 @@ class AnimeExtensionManager(
      * the new languages will not be added to respect the user enabled choices.
      */
     private fun enableAdditionalSubLanguages(animeextensions: List<AnimeExtension.Available>) {
-        if (subLanguagesEnabledOnFirstRun || animeextensions.isEmpty()) {
+        if (preferences.enabledLanguages().isSet() || animeextensions.isEmpty()) {
             return
         }
 
@@ -225,7 +223,6 @@ class AnimeExtensionManager(
         }
 
         preferences.enabledLanguages().set(defaultLanguages + languagesToEnable)
-        subLanguagesEnabledOnFirstRun = true
     }
 
     /**

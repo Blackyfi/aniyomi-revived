@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.source.ContentLanguages
 import eu.kanade.domain.source.manga.interactor.GetEnabledMangaSources
 import eu.kanade.domain.source.manga.interactor.ToggleExcludeFromMangaDataSaver
 import eu.kanade.domain.source.manga.interactor.ToggleMangaSource
@@ -19,6 +20,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -28,6 +30,7 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.source.manga.model.Pin
 import tachiyomi.domain.source.manga.model.Source
+import tachiyomi.domain.source.manga.repository.MangaSourceRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.TreeMap
@@ -35,6 +38,7 @@ import java.util.TreeMap
 class MangaSourcesScreenModel(
     private val preferences: BasePreferences = Injekt.get(),
     private val sourcePreferences: SourcePreferences = Injekt.get(),
+    private val sourceRepository: MangaSourceRepository = Injekt.get(),
     private val getEnabledSources: GetEnabledMangaSources = Injekt.get(),
     private val toggleSource: ToggleMangaSource = Injekt.get(),
     private val toggleSourcePin: ToggleMangaSourcePin = Injekt.get(),
@@ -47,6 +51,17 @@ class MangaSourcesScreenModel(
     val events = _events.receiveAsFlow()
 
     init {
+        screenModelScope.launchIO {
+            combine(
+                sourcePreferences.contentLanguageSelection().changes(),
+                sourcePreferences.enabledLanguages().changes(),
+                sourceRepository.getOnlineMangaSources(),
+            ) { selection, enabled, sources ->
+                ContentLanguages.hiddenSourceCount(selection, enabled, sources) { it.lang }
+            }
+                .catch { logcat(LogPriority.ERROR, it) }
+                .collectLatest { count -> mutableState.update { it.copy(hiddenByLanguage = count) } }
+        }
         screenModelScope.launchIO {
             getEnabledSources.subscribe()
                 .catch {
@@ -138,6 +153,7 @@ class MangaSourcesScreenModel(
     data class State(
         val dialog: Dialog? = null,
         val isLoading: Boolean = true,
+        val hiddenByLanguage: Int = 0,
         val items: ImmutableList<MangaSourceUiModel> = persistentListOf(),
         // SY -->
         val dataSaverEnabled: Boolean = false,

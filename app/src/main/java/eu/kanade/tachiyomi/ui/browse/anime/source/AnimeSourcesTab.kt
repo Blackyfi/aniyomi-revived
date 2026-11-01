@@ -55,6 +55,7 @@ fun Screen.animeSourcesTab(): TabContent {
                 onClickPin = screenModel::togglePin,
                 onLongClickItem = screenModel::showSourceDialog,
                 onClickGetExtensions = BrowseTab::showAnimeExtension,
+                onClickHiddenSources = { navigator.push(AnimeSourcesFilterScreen()) },
             )
 
             state.dialog?.let { dialog ->
