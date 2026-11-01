@@ -442,6 +442,12 @@ class PlayerActivity : BaseActivity() {
                 if (it != -1f) viewModel.changeBrightnessTo(it)
             }
         }
+
+        if (playerPreferences.rememberPlayerVolume().get()) {
+            playerPreferences.playerVolumeValue().get().let {
+                if (it >= 0f) viewModel.changeVolumeTo(it.toInt())
+            }
+        }
     }
 
     private fun executeMPVCommand(commands: Array<String>) {
