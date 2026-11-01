@@ -84,6 +84,7 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -496,29 +497,28 @@ class PlayerActivity : BaseActivity() {
         if (advancedPlayerPreferences.mpvUserFiles().get()) {
             storageManager.getScriptsDirectory()?.listFiles()?.forEach { file ->
                 val outFile = scriptsDir()?.createFile(file.name)
-                outFile?.let {
-                    file.openInputStream().copyTo(it.openOutputStream())
-                }
+                outFile?.let { file.copyContentsTo(it) }
             }
             storageManager.getScriptOptsDirectory()?.listFiles()?.forEach { file ->
                 val outFile = scriptOptsDir()?.createFile(file.name)
-                outFile?.let {
-                    file.openInputStream().copyTo(it.openOutputStream())
-                }
+                outFile?.let { file.copyContentsTo(it) }
             }
             storageManager.getShadersDirectory()?.listFiles()?.forEach { file ->
                 val outFile = shadersDir()?.createFile(file.name)
-                outFile?.let {
-                    file.openInputStream().copyTo(it.openOutputStream())
-                }
+                outFile?.let { file.copyContentsTo(it) }
             }
         }
 
         // Copy over the bridge file
         val luaFile = scriptsDir()?.createFile("aniyomi.lua")
-        val luaBridge = assets.open("aniyomi.lua")
         luaFile?.openOutputStream()?.bufferedWriter()?.use { scriptLua ->
-            luaBridge.bufferedReader().use { scriptLua.write(it.readText()) }
+            assets.open("aniyomi.lua").bufferedReader().use { scriptLua.write(it.readText()) }
+        }
+    }
+
+    private fun UniFile.copyContentsTo(target: UniFile) {
+        openInputStream().use { input ->
+            target.openOutputStream().use { input.copyTo(it) }
         }
     }
 
@@ -552,14 +552,15 @@ class PlayerActivity : BaseActivity() {
     private fun copyFontsDirectory(mpvDir: UniFile) {
         // TODO: I think this is a bad hack.
         //  We need to find a way to let MPV directly access our fonts directory.
-        CoroutineScope(Dispatchers.IO).launchIO {
+        lifecycleScope.launchIO {
             val fontsDirectory = mpvDir.createDirectory(MPV_FONTS_DIR)!!
 
             storageManager.getFontsDirectory()?.listFiles()?.forEach { font ->
-                val outFile = fontsDirectory.createFile(font.name)
-                outFile?.let {
-                    font.openInputStream().copyTo(it.openOutputStream())
-                }
+                ensureActive()
+                val outFile = fontsDirectory.createFile(font.name) ?: return@forEach
+                // Fonts can be megabytes each and rarely change. An interrupted copy leaves a
+                // different length, so it's redone next time.
+                if (outFile.length() != font.length()) font.copyContentsTo(outFile)
             }
 
             MPVLib.setPropertyString("sub-fonts-dir", fontsDirectory.filePath!!)
