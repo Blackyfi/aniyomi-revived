@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension.anime
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import androidx.core.os.trace
 import eu.kanade.domain.extension.anime.interactor.TrustAnimeExtension
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
@@ -150,7 +151,7 @@ class AnimeExtensionManager(
      */
     private suspend fun initAnimeExtensions() {
         try {
-            val animeextensions = AnimeExtensionLoader.loadExtensions(context)
+            val animeextensions = trace("AnimeExtensionScan") { AnimeExtensionLoader.loadExtensions(context) }
 
             val installed = animeextensions
                 .filterIsInstance<AnimeLoadResult.Success>()

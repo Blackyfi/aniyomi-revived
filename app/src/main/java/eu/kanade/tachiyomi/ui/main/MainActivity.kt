@@ -141,6 +141,11 @@ class MainActivity : BaseActivity() {
 
     // To be checked by splash screen. If true then splash screen will be removed.
     var ready = false
+        set(value) {
+            field = value
+            // The content behind the splash screen has loaded: this is "time to full display"
+            if (value) reportFullyDrawn()
+        }
 
     // Migration runs off the main thread; the splash screen waits on this flag.
     private var migrationComplete = false

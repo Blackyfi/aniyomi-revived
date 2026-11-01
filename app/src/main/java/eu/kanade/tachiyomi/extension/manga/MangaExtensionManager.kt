@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension.manga
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import androidx.core.os.trace
 import eu.kanade.domain.extension.manga.interactor.TrustMangaExtension
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
@@ -145,7 +146,7 @@ class MangaExtensionManager(
      */
     private suspend fun initExtensions() {
         try {
-            val extensions = MangaExtensionLoader.loadMangaExtensions(context)
+            val extensions = trace("MangaExtensionScan") { MangaExtensionLoader.loadMangaExtensions(context) }
 
             val installed = extensions
                 .filterIsInstance<MangaLoadResult.Success>()
