@@ -326,9 +326,7 @@ class MainActivity : BaseActivity() {
         val startTime = System.currentTimeMillis()
         splashScreen?.setKeepOnScreenCondition {
             val elapsed = System.currentTimeMillis() - startTime
-            elapsed <= SPLASH_MIN_DURATION ||
-                (!ready || !migrationComplete) &&
-                elapsed <= SPLASH_MAX_DURATION
+            (!ready || !migrationComplete) && elapsed <= SPLASH_MAX_DURATION
         }
         setSplashScreenExitAnimation(splashScreen)
 
@@ -641,6 +639,5 @@ class MainActivity : BaseActivity() {
 }
 
 // Splash screen
-private const val SPLASH_MIN_DURATION = 500 // ms
 private const val SPLASH_MAX_DURATION = 5000 // ms
 private const val SPLASH_EXIT_ANIM_DURATION = 400L // ms
