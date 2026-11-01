@@ -88,4 +88,8 @@
         <item quantity="one">%d download added to the queue</item>
         <item quantity="other">%d downloads added to the queue</item>
     </plurals>
+    <plurals name="content_language_hidden_sources">
+        <item quantity="one">%d installed source isn\'t in your content language, so it isn\'t listed here. Anything from it in your library keeps working.</item>
+        <item quantity="other">%d installed sources aren\'t in your content language, so they aren\'t listed here. Anything from them in your library keeps working.</item>
+    </plurals>
 </resources>
