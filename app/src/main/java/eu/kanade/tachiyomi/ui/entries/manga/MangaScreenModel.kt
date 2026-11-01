@@ -394,7 +394,8 @@ class MangaScreenModel(
 
                 // Finally match with enhanced tracking when available
                 addTracks.bindEnhancedTrackers(manga, state.source)
-                if (autoOpenTrack) {
+                // With a category picker open, the track sheet follows when the picker closes.
+                if (autoOpenTrack && !isFromChangeCategory) {
                     showTrackDialog()
                 }
             }

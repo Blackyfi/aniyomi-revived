@@ -3,8 +3,10 @@ package eu.kanade.tachiyomi.ui.history
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
@@ -16,6 +18,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.history.anime.animeHistoryTab
 import eu.kanade.tachiyomi.ui.history.anime.resumeLastEpisodeSeenEvent
 import eu.kanade.tachiyomi.ui.history.manga.mangaHistoryTab
+import eu.kanade.tachiyomi.ui.history.manga.resumeLastChapterReadEvent
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.domain.entries.manga.model.MangaType
@@ -41,8 +44,16 @@ data object HistoriesTab : Tab {
             )
         }
 
+    // The sub-tab on screen. Only that one can answer a resume request, so nothing queues up for
+    // a sub-tab that isn't showing.
+    private var currentSubTab = TAB_ANIME
+
     override suspend fun onReselect(navigator: Navigator) {
-        resumeLastEpisodeSeenEvent.send(Unit)
+        if (currentSubTab == TAB_ANIME) {
+            resumeLastEpisodeSeenEvent.trySend(Unit)
+        } else {
+            resumeLastChapterReadEvent.trySend(Unit)
+        }
     }
 
     @Composable
@@ -51,8 +62,12 @@ data object HistoriesTab : Tab {
         val fromMore = currentNavigationStyle() == NavStyle.MOVE_HISTORY_TO_MORE
 
         // Each tab supplies its own search state via TabContent.
+        val pagerState = rememberPagerState { TAB_COUNT }
+        SideEffect { currentSubTab = pagerState.currentPage }
+
         TabbedScreen(
             titleRes = MR.strings.label_recent_manga,
+            state = pagerState,
             tabs = persistentListOf(
                 animeHistoryTab(context, fromMore),
                 mangaHistoryTab(context, fromMore),
@@ -69,3 +84,4 @@ data object HistoriesTab : Tab {
 private const val TAB_ANIME = 0
 private const val TAB_MANGA = 1
 private const val TAB_MANHWA = 2
+private const val TAB_COUNT = 3

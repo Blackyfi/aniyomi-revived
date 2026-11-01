@@ -142,10 +142,11 @@ data object DownloadsTab : Tab {
                                 modifier = Modifier.weight(1f, false),
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (animeDownloadCount > 0) {
+                            val visibleCount = if (state.currentPage == 0) animeDownloadCount else mangaDownloadCount
+                            if (visibleCount > 0) {
                                 val pillAlpha = if (isSystemInDarkTheme()) 0.12f else 0.08f
                                 Pill(
-                                    text = "$animeDownloadCount",
+                                    text = "$visibleCount",
                                     modifier = Modifier.padding(start = 4.dp),
                                     color = MaterialTheme.colorScheme.onBackground
                                         .copy(alpha = pillAlpha),
