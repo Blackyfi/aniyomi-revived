@@ -202,9 +202,9 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
             val categoriesToExclude = libraryPreferences.animeUpdateCategoriesExclude().get().map { it.toLong() }
             val excludedAnimeIds = if (categoriesToExclude.isNotEmpty()) {
-                libraryAnime.filter { it.category in categoriesToExclude }.map { it.anime.id }
+                libraryAnime.filter { it.category in categoriesToExclude }.mapTo(HashSet()) { it.anime.id }
             } else {
-                emptyList()
+                emptySet()
             }
 
             includedAnime
@@ -338,6 +338,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                             val episodesToDownload = filterEpisodesForDownload.await(anime, newEpisodes)
 
                                             if (episodesToDownload.isNotEmpty()) {
+                                                downloadEpisodes(anime, episodesToDownload)
                                                 hasDownloads.set(true)
                                             }
 

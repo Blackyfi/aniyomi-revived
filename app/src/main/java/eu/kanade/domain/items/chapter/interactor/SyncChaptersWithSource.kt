@@ -73,11 +73,13 @@ class SyncChaptersWithSource(
 
         val newChapters = mutableListOf<Chapter>()
         val updatedChapters = mutableListOf<Chapter>()
-        val removedChapters = dbChapters.filterNot { dbChapter ->
-            sourceChapters.any { sourceChapter ->
-                dbChapter.url == sourceChapter.url
-            }
-        }
+        val sourceUrls = sourceChapters.mapTo(HashSet((sourceChapters.size * 2).coerceAtLeast(16))) { it.url }
+        val removedChapters = dbChapters.filterNot { it.url in sourceUrls }
+
+        // Series can run to thousands of items, so don't scan the list for each of them. Should the
+        // database hold duplicates of a url, the first one is the one to update.
+        val dbChaptersByUrl = HashMap<String, Chapter>((dbChapters.size * 2).coerceAtLeast(16))
+        dbChapters.forEach { dbChaptersByUrl.putIfAbsent(it.url, it) }
 
         // Used to not set upload date of older chapters
         // to a higher value than newer chapters
@@ -101,7 +103,7 @@ class SyncChaptersWithSource(
             )
             chapter = chapter.copy(chapterNumber = chapterNumber)
 
-            val dbChapter = dbChapters.find { it.url == chapter.url }
+            val dbChapter = dbChaptersByUrl[chapter.url]
 
             if (dbChapter == null) {
                 val toAddChapter = if (chapter.dateUpload == 0L) {

@@ -71,11 +71,13 @@ class SyncEpisodesWithSource(
 
         val newEpisodes = mutableListOf<Episode>()
         val updatedEpisodes = mutableListOf<Episode>()
-        val removedEpisodes = dbEpisodes.filterNot { dbEpisode ->
-            sourceEpisodes.any { sourceEpisode ->
-                dbEpisode.url == sourceEpisode.url
-            }
-        }
+        val sourceUrls = sourceEpisodes.mapTo(HashSet((sourceEpisodes.size * 2).coerceAtLeast(16))) { it.url }
+        val removedEpisodes = dbEpisodes.filterNot { it.url in sourceUrls }
+
+        // Series can run to thousands of items, so don't scan the list for each of them. Should the
+        // database hold duplicates of a url, the first one is the one to update.
+        val dbEpisodesByUrl = HashMap<String, Episode>((dbEpisodes.size * 2).coerceAtLeast(16))
+        dbEpisodes.forEach { dbEpisodesByUrl.putIfAbsent(it.url, it) }
 
         // Used to not set upload date of older episodes
         // to a higher value than newer episodes
@@ -99,7 +101,7 @@ class SyncEpisodesWithSource(
             )
             episode = episode.copy(episodeNumber = episodeNumber)
 
-            val dbEpisode = dbEpisodes.find { it.url == episode.url }
+            val dbEpisode = dbEpisodesByUrl[episode.url]
 
             if (dbEpisode == null) {
                 val toAddEpisode = if (episode.dateUpload == 0L) {
