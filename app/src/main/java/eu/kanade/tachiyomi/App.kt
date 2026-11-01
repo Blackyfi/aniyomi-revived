@@ -36,6 +36,8 @@ import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
+import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
+import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.di.AppModule
 import eu.kanade.tachiyomi.di.PreferenceModule
@@ -65,7 +67,11 @@ import tachiyomi.core.common.util.system.CompositeLogcatLogger
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.InMemoryLogcatBuffer
 import tachiyomi.core.common.util.system.logcat
+import tachiyomi.data.Database
+import tachiyomi.domain.source.anime.service.AnimeSourceManager
+import tachiyomi.domain.source.manga.service.MangaSourceManager
 import tachiyomi.i18n.MR
+import tachiyomi.mi.data.AnimeDatabase
 import tachiyomi.presentation.widget.entries.anime.AnimeWidgetManager
 import tachiyomi.presentation.widget.entries.manga.MangaWidgetManager
 import uy.kohesive.injekt.Injekt
@@ -108,6 +114,20 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
+
+        // Build the expensive singletons ahead of first use, off the main thread for a faster cold start
+        scope.launchIO {
+            Injekt.get<NetworkHelper>()
+
+            Injekt.get<MangaSourceManager>()
+            Injekt.get<AnimeSourceManager>()
+
+            Injekt.get<Database>()
+            Injekt.get<AnimeDatabase>()
+
+            Injekt.get<MangaDownloadManager>()
+            Injekt.get<AnimeDownloadManager>()
+        }
 
         scope.launchIO {
             // Create notification channels first so notifications posted by the incognito
