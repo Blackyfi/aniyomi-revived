@@ -26,11 +26,11 @@ import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.toFFmpegString
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -117,12 +117,26 @@ class AnimeDownloader(
     val isRunning: Boolean
         get() = downloaderJob?.isActive ?: false
 
+    /**
+     * Completes once the queue saved by the previous process is back in [queueState].
+     */
+    private val queueRestored = CompletableDeferred<Unit>()
+
     init {
         scope.launch {
-            val episodes = async { store.restore() }
-            addAllToQueue(episodes.await())
+            try {
+                // The store drops every entry whose source isn't registered and then clears itself,
+                // so restoring before the extensions are in would lose those downloads for good.
+                sourceManager.isInitialized.first { it }
+                val queuedIds = queueState.value.map { it.episode.id }.toSet()
+                addAllToQueue(store.restore().filterNot { it.episode.id in queuedIds })
+            } finally {
+                queueRestored.complete(Unit)
+            }
         }
     }
+
+    suspend fun awaitQueueRestored() = queueRestored.await()
 
     /**
      * Starts the downloader. It doesn't do anything if it's already running or there isn't anything
