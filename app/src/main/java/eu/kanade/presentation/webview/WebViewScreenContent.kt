@@ -109,14 +109,13 @@ fun WebViewScreenContent(
                 request: WebResourceRequest?,
             ): Boolean {
                 request?.let {
-                    // Don't attempt to open blobs as webpages
-                    if (it.url.toString().startsWith("blob:http")) {
-                        return false
-                    }
-
-                    // Ignore intents urls
-                    if (it.url.toString().startsWith("intent://")) {
-                        return true
+                    when (it.url.scheme?.lowercase()) {
+                        "http", "https" -> Unit
+                        // Leave these to the WebView, which applies its own navigation rules.
+                        "about", "blob", "data" -> return false
+                        // Pages don't get to navigate to anything else: not other apps through
+                        // intent: and friends, and not local files through an app-initiated load.
+                        else -> return true
                     }
 
                     // Continue with request, but with custom headers
