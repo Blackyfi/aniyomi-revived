@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.browse.components.ContentLanguageHiddenHint
 import eu.kanade.presentation.browse.components.GetExtensionsHint
 import eu.kanade.presentation.browse.manga.components.BaseMangaSourceItem
 import eu.kanade.tachiyomi.ui.browse.manga.source.MangaSourcesScreenModel
@@ -51,6 +52,7 @@ fun MangaSourcesScreen(
     onClickPin: (Source) -> Unit,
     onLongClickItem: (Source) -> Unit,
     onClickGetExtensions: () -> Unit,
+    onClickHiddenSources: () -> Unit,
 ) {
     when {
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
@@ -76,6 +78,15 @@ fun MangaSourcesScreen(
                     item(key = "get-extensions-hint", contentType = "hint") {
                         GetExtensionsHint(
                             onClickGetExtensions = onClickGetExtensions,
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+                if (state.hiddenByLanguage > 0) {
+                    item(key = "content-language-hint", contentType = "hint") {
+                        ContentLanguageHiddenHint(
+                            count = state.hiddenByLanguage,
+                            onClick = onClickHiddenSources,
                             modifier = Modifier.animateItem(),
                         )
                     }

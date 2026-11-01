@@ -55,6 +55,7 @@ fun Screen.mangaSourcesTab(): TabContent {
                 onClickPin = screenModel::togglePin,
                 onLongClickItem = screenModel::showSourceDialog,
                 onClickGetExtensions = BrowseTab::showExtension,
+                onClickHiddenSources = { navigator.push(MangaSourcesFilterScreen()) },
             )
 
             state.dialog?.let { dialog ->
