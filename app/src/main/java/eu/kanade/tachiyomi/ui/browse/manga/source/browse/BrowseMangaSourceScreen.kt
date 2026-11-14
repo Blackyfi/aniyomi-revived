@@ -123,6 +123,11 @@ data class BrowseMangaSourceScreen(
             )
         }
 
+        // Runs again whenever this screen comes back on top, e.g. after the source's settings.
+        LaunchedEffect(Unit) {
+            screenModel.onScreenShown()
+        }
+
         LaunchedEffect(screenModel.source) {
             assistUrl = (screenModel.source as? HttpSource)?.baseUrl
         }

@@ -12,6 +12,9 @@ import androidx.paging.cachedIn
 import androidx.paging.filter
 import androidx.paging.map
 import cafe.adriel.voyager.core.model.StateScreenModel
+import eu.kanade.tachiyomi.animesource.sourcePreferences
+import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
+import android.content.SharedPreferences
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.core.preference.asState
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
@@ -109,9 +112,9 @@ class BrowseAnimeSourceScreenModel(
      * Flow of Pager flow tied to [State.listing]
      */
     private val hideInLibraryItems = sourcePreferences.hideInAnimeLibraryItems().get()
-    val animePagerFlowFlow = state.map { it.listing }
+    val animePagerFlowFlow = state.map { it.listing to it.reloadKey }
         .distinctUntilChanged()
-        .map { listing ->
+        .map { (listing, _) ->
             Pager(PagingConfig(pageSize = 25)) {
                 getRemoteAnime.subscribe(sourceId, listing.query ?: "", listing.filters)
             }.flow.map { pagingData ->
@@ -145,6 +148,32 @@ class BrowseAnimeSourceScreenModel(
         } else {
             libraryPreferences.animePortraitColumns()
         }.get()
+    }
+
+    // Source settings can change what a listing returns (e.g. saved default tags), but the
+    // settings screen sits on top of this one, so nothing reloads on return. Watch the source's
+    // preferences while browsing and reload once the user comes back. The listener is held in a
+    // field because SharedPreferences only keeps weak references to listeners.
+    private var sourceSettingsChanged = false
+    private val sourceSettings: SharedPreferences? = (source as? ConfigurableAnimeSource)?.sourcePreferences()
+    private val sourceSettingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        sourceSettingsChanged = true
+    }
+
+    init {
+        sourceSettings?.registerOnSharedPreferenceChangeListener(sourceSettingsListener)
+    }
+
+    override fun onDispose() {
+        sourceSettings?.unregisterOnSharedPreferenceChangeListener(sourceSettingsListener)
+        super.onDispose()
+    }
+
+    /** Called each time the browse screen is shown; reloads the listing if the source's settings changed meanwhile. */
+    fun onScreenShown() {
+        if (!sourceSettingsChanged) return
+        sourceSettingsChanged = false
+        mutableState.update { it.copy(reloadKey = it.reloadKey + 1) }
     }
 
     fun resetFilters() {
@@ -372,6 +401,8 @@ class BrowseAnimeSourceScreenModel(
         val filters: AnimeFilterList = AnimeFilterList(),
         val toolbarQuery: String? = null,
         val dialog: Dialog? = null,
+        // Bumped to reload the current listing, e.g. after the source's settings changed.
+        val reloadKey: Int = 0,
     ) {
         val isUserQuery get() = listing is Listing.Search && !listing.query.isNullOrEmpty()
     }
