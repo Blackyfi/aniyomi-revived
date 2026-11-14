@@ -9,19 +9,48 @@
 ### Full-featured player and reader, based on ~~Tachiyomi~~ Mihon.
 Discover and watch anime, cartoons, series, and more – easier than ever on your Android device.
 
-[![Discord server](https://img.shields.io/discord/841701076242530374.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/F32UjdJZrR)
-[![GitHub downloads](https://img.shields.io/github/downloads/aniyomiorg/aniyomi/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/aniyomiorg/aniyomi/releases)
+A maintained fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), which is no longer updated.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/aniyomiorg/aniyomi/build_push.yml?labelColor=27303D)](https://github.com/aniyomiorg/aniyomi/actions/workflows/build_push.yml)
+[![Discord server](https://img.shields.io/discord/841701076242530374.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/F32UjdJZrR)
+[![GitHub downloads](https://img.shields.io/github/downloads/Blackyfi/aniyomi-revived/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/Blackyfi/aniyomi-revived/releases)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/Blackyfi/aniyomi-revived/build_push.yml?labelColor=27303D)](https://github.com/Blackyfi/aniyomi-revived/actions/workflows/build_push.yml)
 [![License: Apache-2.0](https://img.shields.io/github/license/aniyomiorg/aniyomi?labelColor=27303D&color=818cf8)](/LICENSE)
 [![Translation status](https://img.shields.io/weblate/progress/aniyomi?labelColor=27303D&color=946300)](https://hosted.weblate.org/engage/aniyomi/)
 
 ## Download
 
-[![Aniyomi Stable](https://img.shields.io/github/release/aniyomiorg/aniyomi.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/aniyomiorg/aniyomi/releases)
-[![Aniyomi Preview](https://img.shields.io/github/v/release/aniyomiorg/aniyomi-preview.svg?maxAge=3600&label=Beta&labelColor=2c2c47&color=1c1c39)](https://github.com/aniyomiorg/aniyomi-preview/releases)
+[![Aniyomi Stable](https://img.shields.io/github/release/Blackyfi/aniyomi-revived.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/Blackyfi/aniyomi-revived/releases)
 
 *Requires Android 8.0 or higher.*
+
+</div>
+
+## Verifying a download
+
+Every release is built by GitHub Actions straight from this repository; no APK is built or uploaded by hand. You can check that yourself in a few ways.
+
+**It was built from this source.** Each APK comes with a build attestation signed by GitHub, recording the exact commit and workflow run that produced it. With the [GitHub CLI](https://cli.github.com/):
+
+```
+gh attestation verify aniyomi-v0.18.1.46.apk --repo Blackyfi/aniyomi-revived
+```
+
+All attestations are also listed on the [attestations page](https://github.com/Blackyfi/aniyomi-revived/attestations).
+
+**It is signed by us.** Every release is signed with the same key. Its certificate SHA-256 fingerprint is:
+
+```
+6D:16:C0:9F:5D:EB:49:1B:A6:BE:5B:72:5E:15:82:8C:B4:EE:A1:98:A2:9C:DE:9A:45:23:71:36:17:D4:81:EF
+```
+
+On Android, [AppVerifier](https://github.com/soupslurpr/AppVerifier) can compare it for you; on a computer, run `apksigner verify --print-certs` on the APK. Android also refuses to install an update signed with a different key over an existing install.
+
+**It was scanned.** Each release APK is sent to VirusTotal, and the scan links are added at the bottom of the release notes.
+
+The full source is here, so anything above can be traced back to the code.
+
+<div align="center">
 
 ## Features
 
