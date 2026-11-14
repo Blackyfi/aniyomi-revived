@@ -28,7 +28,7 @@ A maintained fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), which is 
 
 ## Verifying a download
 
-Every release is built by GitHub Actions straight from this repository; no APK is built or uploaded by hand. You can check that yourself in a few ways.
+This app is safe to install, and you shouldn't have to take my word for it. Every release is built by GitHub Actions straight from this repository, never by hand, then signed, attested and scanned on VirusTotal, with checksums listed in the release notes. If you'd rather check for yourself, upload the APK to [VirusTotal](https://www.virustotal.com/) or any scanner you trust, or use the checks below.
 
 **It was built from this source.** Each APK comes with a build attestation signed by GitHub, recording the exact commit and workflow run that produced it. With the [GitHub CLI](https://cli.github.com/):
 
