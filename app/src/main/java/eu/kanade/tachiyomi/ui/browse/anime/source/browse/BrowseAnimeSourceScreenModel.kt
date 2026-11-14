@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.browse.anime.source.browse
 
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.runtime.Immutable
@@ -12,9 +13,6 @@ import androidx.paging.cachedIn
 import androidx.paging.filter
 import androidx.paging.map
 import cafe.adriel.voyager.core.model.StateScreenModel
-import eu.kanade.tachiyomi.animesource.sourcePreferences
-import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
-import android.content.SharedPreferences
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.core.preference.asState
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
@@ -24,7 +22,9 @@ import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.track.anime.interactor.AddAnimeTracks
 import eu.kanade.presentation.util.ioCoroutineScope
 import eu.kanade.tachiyomi.animesource.AnimeCatalogueSource
+import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
+import eu.kanade.tachiyomi.animesource.sourcePreferences
 import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.util.removeBackgrounds
