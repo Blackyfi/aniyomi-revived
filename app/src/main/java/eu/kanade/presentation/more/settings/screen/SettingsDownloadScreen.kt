@@ -406,6 +406,7 @@ object SettingsDownloadScreen : SearchableSettings {
                 "idm.internet.download.manager.plus" -> true
                 "idm.internet.download.manager.adm.lite" -> true
                 "com.dv.adm" -> true
+                "com.fluxdown.app" -> true
                 else -> false
             }
         }

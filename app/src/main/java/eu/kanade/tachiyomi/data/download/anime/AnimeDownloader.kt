@@ -47,7 +47,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
@@ -735,6 +738,27 @@ class AnimeDownloader(
                             putExtra("extra_headers", bundle)
                         }
                     }
+                    // FluxDown
+                    pkgName == "com.fluxdown.app" -> {
+                        val headers = externalDownloaderHeaders(video, source)
+                        val cookie = headers.entries.firstOrNull { it.key.equals("Cookie", true) }?.value
+                        val referer = headers.entries.firstOrNull { it.key.equals("Referer", true) }?.value
+                        val otherHeaders = headers.filterKeys {
+                            !it.equals("Cookie", true) && !it.equals("Referer", true)
+                        }
+
+                        intent.apply {
+                            // The entry point FluxDown keeps for apps handing it a download
+                            component = ComponentName(pkgName, "$pkgName.ExternalDownloadManager")
+                            action = Intent.ACTION_VIEW
+                            data = video.videoUrl.toUri()
+
+                            putExtra("com.fluxdown.extra.FILE_NAME", "$filename.mkv")
+                            putExtra("com.fluxdown.extra.HEADERS", otherHeaders.toJsonObject().toString())
+                            cookie?.let { putExtra("Cookie", it) }
+                            referer?.let { putExtra("Referer", it) }
+                        }
+                    }
                     // ADM
                     pkgName.startsWith("com.dv.adm") -> {
                         val headers = (video.headers ?: source.headers).toList()
@@ -788,6 +812,25 @@ class AnimeDownloader(
             throw e
         }
     }
+
+    /**
+     * Headers an external downloader needs to fetch [video] the way our client would: the video's
+     * (or source's) headers, plus the client's cookies for that URL when no cookie header is set.
+     */
+    private fun externalDownloaderHeaders(video: Video, source: AnimeHttpSource): Map<String, String> {
+        val headers = (video.headers ?: source.headers).toMap().toMutableMap()
+        if (headers.keys.none { it.equals("Cookie", true) }) {
+            val cookies = video.videoUrl.toHttpUrlOrNull()
+                ?.let { source.client.cookieJar.loadForRequest(it) }
+                .orEmpty()
+            if (cookies.isNotEmpty()) {
+                headers["Cookie"] = cookies.joinToString("; ") { "${it.name}=${it.value}" }
+            }
+        }
+        return headers
+    }
+
+    private fun Map<String, String>.toJsonObject() = JsonObject(mapValues { JsonPrimitive(it.value) })
 
     /**
      * Checks if the download was successful.
