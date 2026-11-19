@@ -22,6 +22,8 @@ A maintained fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), which is 
 
 [![Aniyomi Stable](https://img.shields.io/github/release/Blackyfi/aniyomi-revived.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/Blackyfi/aniyomi-revived/releases)
 
+Released November 14, 2026 · Previous version ([v0.18.1.45](https://github.com/Blackyfi/aniyomi-revived/releases/tag/v0.18.1.45)): November 14, 2026
+
 *Requires Android 8.0 or higher.*
 
 </div>
