@@ -49,6 +49,8 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.i18n.stringResource
@@ -757,6 +759,25 @@ class AnimeDownloader(
                             putExtra("com.fluxdown.extra.HEADERS", otherHeaders.toJsonObject().toString())
                             cookie?.let { putExtra("Cookie", it) }
                             referer?.let { putExtra("Referer", it) }
+                        }
+                    }
+                    // AB Download Manager
+                    pkgName == "com.abdownloadmanager" -> {
+                        val isHls = video.videoUrl.toHttpUrlOrNull()
+                            ?.encodedPath
+                            ?.endsWith(".m3u8", ignoreCase = true) == true
+                        // Versions without HLS support read an unknown type as a plain link
+                        val credentials = buildJsonObject {
+                            put("type", if (isHls) "hls" else "http")
+                            put("link", video.videoUrl)
+                            put("headers", externalDownloaderHeaders(video, source).toJsonObject())
+                        }
+
+                        intent.apply {
+                            component = ComponentName(pkgName, "$pkgName.android.pages.add.AddDownloadActivity")
+                            action = Intent.ACTION_SEND
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, credentials.toString())
                         }
                     }
                     // ADM
