@@ -49,7 +49,7 @@ All attestations are also listed on the [attestations page](https://github.com/B
 
 On Android, [AppVerifier](https://github.com/soupslurpr/AppVerifier) can compare it for you; on a computer, run `apksigner verify --print-certs` on the APK. Android also refuses to install an update signed with a different key over an existing install.
 
-**It was scanned.** Each release APK is sent to VirusTotal, and the scan links are added at the bottom of the release notes.
+**It was scanned.** Each release APK is sent to VirusTotal, and the scan links are added at the bottom of the release notes. The phone builds (arm64-v8a, armeabi-v7a) come back clean. One engine out of about 67, Elastic, flags the x86 and Universal builds as "Asacub". That's a false positive: its rule is a single 22-byte pattern, and it matches an ordinary JNI call (`NewGlobalRef`) in the video player's library (`lib/x86/libplayer.so`), which has been there unchanged since the first release. The ARM builds use different machine code, so the rule can't match them. I've reported it to Elastic ([elastic/protections-artifacts#142](https://github.com/elastic/protections-artifacts/issues/142)).
 
 The full source is here, so anything above can be traced back to the code.
 
