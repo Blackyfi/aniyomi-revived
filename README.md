@@ -41,7 +41,7 @@ gh attestation verify aniyomi-v0.18.1.46.apk --repo Blackyfi/aniyomi-revived
 
 All attestations are also listed on the [attestations page](https://github.com/Blackyfi/aniyomi-revived/attestations).
 
-**It is signed by us.** Every release is signed with the same key. Its certificate SHA-256 fingerprint is:
+**It is signed by me.** Every release is signed with the same key. Its certificate SHA-256 fingerprint is:
 
 ```
 6D:16:C0:9F:5D:EB:49:1B:A6:BE:5B:72:5E:15:82:8C:B4:EE:A1:98:A2:9C:DE:9A:45:23:71:36:17:D4:81:EF

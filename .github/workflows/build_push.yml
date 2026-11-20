@@ -137,7 +137,7 @@ jobs:
             These APKs were built by GitHub Actions from commit ${{ github.sha }} of this repository.
 
             - **Built from this source:** `gh attestation verify <file>.apk --repo Blackyfi/aniyomi-revived`
-            - **Signed by us:** the signing certificate SHA-256 must be
+            - **Signed by me:** the signing certificate SHA-256 must be
               `6D:16:C0:9F:5D:EB:49:1B:A6:BE:5B:72:5E:15:82:8C:B4:EE:A1:98:A2:9C:DE:9A:45:23:71:36:17:D4:81:EF`
               (check with [AppVerifier](https://github.com/soupslurpr/AppVerifier) or `apksigner verify --print-certs`)
             - **Scanned:** VirusTotal links are added below once the scans finish.
