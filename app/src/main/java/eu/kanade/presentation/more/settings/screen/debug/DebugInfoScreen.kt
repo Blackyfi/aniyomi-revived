@@ -17,7 +17,7 @@ import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.WebViewUtil
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.guava.await
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.i18n.MR
 
 class DebugInfoScreen : Screen() {
@@ -76,7 +76,9 @@ class DebugInfoScreen : Screen() {
     @Composable
     private fun getProfileVerifierPreference(): Preference.PreferenceItem.TextPreference {
         val status by produceState(initialValue = "-") {
-            val result = ProfileVerifier.getCompilationStatusAsync().await().profileInstallResultCode
+            val result = withIOContext {
+                ProfileVerifier.getCompilationStatusAsync().get()
+            }.profileInstallResultCode
             value = when (result) {
                 ProfileVerifier.CompilationStatus
                     .RESULT_CODE_NO_PROFILE_INSTALLED,
