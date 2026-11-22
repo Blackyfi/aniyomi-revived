@@ -153,6 +153,7 @@ fun MoreSheet(
                         Icon(
                             imageVector = Icons.Outlined.PhotoCamera,
                             contentDescription = stringResource(AYMR.strings.player_action_screenshot),
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                     TextButton(onClick = onEnterFiltersPanel) {

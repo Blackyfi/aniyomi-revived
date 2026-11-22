@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.SearchableSettings
+import eu.kanade.tachiyomi.ui.player.LongPressGesture
 import eu.kanade.tachiyomi.ui.player.SingleActionGesture
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import kotlinx.collections.immutable.persistentListOf
@@ -46,6 +47,7 @@ object PlayerSettingsGesturesScreen : SearchableSettings {
             getSlidersGroup(gesturePreferences = gesturePreferences),
             getSeekingGroup(gesturePreferences = gesturePreferences),
             getDoubleTapGroup(gesturePreferences = gesturePreferences),
+            getLongPressGroup(gesturePreferences = gesturePreferences),
             getMediaControlsGroup(gesturePreferences = gesturePreferences),
         )
     }
@@ -171,6 +173,34 @@ object PlayerSettingsGesturesScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.InfoPreference(
                     title = stringResource(AYMR.strings.pref_double_tap_info),
+                ),
+            ),
+        )
+    }
+
+    @Composable
+    private fun getLongPressGroup(gesturePreferences: GesturePreferences): Preference.PreferenceGroup {
+        val longPressGesture = gesturePreferences.longPressGesture()
+        val holdSpeed = gesturePreferences.holdSpeed()
+        val currentLongPressGesture by longPressGesture.collectAsState()
+
+        return Preference.PreferenceGroup(
+            title = stringResource(AYMR.strings.pref_category_long_press),
+            preferenceItems = persistentListOf(
+                Preference.PreferenceItem.ListPreference(
+                    preference = longPressGesture,
+                    entries = LongPressGesture.entries
+                        .associateWith { stringResource(it.stringRes) }
+                        .toPersistentMap(),
+                    title = stringResource(AYMR.strings.pref_long_press_gesture),
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = holdSpeed,
+                    entries = listOf(1.5f, 2f, 2.5f, 3f, 4f)
+                        .associateWith { if (it % 1f == 0f) "${it.toInt()}x" else "${it}x" }
+                        .toPersistentMap(),
+                    title = stringResource(AYMR.strings.pref_hold_speed),
+                    enabled = currentLongPressGesture == LongPressGesture.SpeedUp,
                 ),
             ),
         )
