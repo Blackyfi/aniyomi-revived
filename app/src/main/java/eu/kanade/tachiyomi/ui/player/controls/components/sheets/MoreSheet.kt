@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardAlt
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,6 +90,7 @@ fun MoreSheet(
     onStartTimer: (Int) -> Unit,
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
+    onOpenScreenshot: () -> Unit,
     customButtons: ImmutableList<CustomButton>,
     modifier: Modifier = Modifier,
 ) {
@@ -146,6 +148,12 @@ fun MoreSheet(
                                 )
                             }
                         }
+                    }
+                    IconButton(onClick = onOpenScreenshot) {
+                        Icon(
+                            imageVector = Icons.Outlined.PhotoCamera,
+                            contentDescription = stringResource(AYMR.strings.player_action_screenshot),
+                        )
                     }
                     TextButton(onClick = onEnterFiltersPanel) {
                         Row(

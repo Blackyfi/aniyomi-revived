@@ -652,6 +652,10 @@ fun PlayerControls(
                 viewModel.showSheet(Sheets.None)
                 viewModel.unpause()
             },
+            onOpenScreenshot = {
+                viewModel.pause()
+                viewModel.showSheet(Sheets.Screenshot)
+            },
             onOpenPanel = viewModel::showPanel,
             onDismissRequest = { viewModel.showSheet(Sheets.None) },
             dismissSheet = dismissSheet,
