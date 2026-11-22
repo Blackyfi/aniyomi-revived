@@ -1,119 +1,208 @@
 <div align="center">
 
-<a href="https://aniyomi.org">
-    <img src="./.github/assets/logo.png" alt="Aniyomi logo" title="Aniyomi logo" width="80"/>
-</a>
+<img src="./.github/assets/logo.png" alt="Aniyomi Revived" width="96"/>
 
-# Aniyomi [App](#)
+# Aniyomi Revived
 
-### Full-featured player and reader, based on ~~Tachiyomi~~ Mihon.
-Discover and watch anime, cartoons, series, and more – easier than ever on your Android device.
+**Watch anime and read manga on Android, with one app and one library.**
 
-A maintained fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), which is no longer updated.
+An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with its own releases, fixes and features.
 
-[![Discord server](https://img.shields.io/discord/841701076242530374.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/F32UjdJZrR)
-[![GitHub downloads](https://img.shields.io/github/downloads/Blackyfi/aniyomi-revived/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/Blackyfi/aniyomi-revived/releases)
+[![Latest release](https://img.shields.io/github/v/release/Blackyfi/aniyomi-revived?label=release&labelColor=27303D&color=818cf8)](https://github.com/Blackyfi/aniyomi-revived/releases/latest)
+[![Release date](https://img.shields.io/github/release-date/Blackyfi/aniyomi-revived?label=updated&labelColor=27303D&color=0D1117)](https://github.com/Blackyfi/aniyomi-revived/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Blackyfi/aniyomi-revived/total?labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF)](https://github.com/Blackyfi/aniyomi-revived/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Blackyfi/aniyomi-revived/build_push.yml?labelColor=27303D&label=build)](https://github.com/Blackyfi/aniyomi-revived/actions/workflows/build_push.yml)
+[![License](https://img.shields.io/github/license/Blackyfi/aniyomi-revived?labelColor=27303D&color=818cf8)](./LICENSE)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Blackyfi/aniyomi-revived/build_push.yml?labelColor=27303D)](https://github.com/Blackyfi/aniyomi-revived/actions/workflows/build_push.yml)
-[![License: Apache-2.0](https://img.shields.io/github/license/aniyomiorg/aniyomi?labelColor=27303D&color=818cf8)](/LICENSE)
-[![Translation status](https://img.shields.io/weblate/progress/aniyomi?labelColor=27303D&color=946300)](https://hosted.weblate.org/engage/aniyomi/)
+[**Download**](#download) · [What's new](#whats-new-in-revived) · [Benchmarks](#benchmarks) · [Features](#features) · [Verify a download](#verify-a-download) · [Changelog](https://github.com/Blackyfi/aniyomi-revived/releases)
+
+<img src="./.github/assets/screenshots/library.jpg" width="32%" alt="Library"/>&nbsp;<img src="./.github/assets/screenshots/entry.jpg" width="32%" alt="Entry details"/>&nbsp;<img src="./.github/assets/screenshots/manhwa.jpg" width="32%" alt="Manhwa tab"/>
+<br>
+<img src="./.github/assets/screenshots/player.jpg" width="97.5%" alt="Video player"/>
+
+</div>
+
+---
+
+> [!NOTE]
+> **About this fork.** I started Revived in May 2026, when Aniyomi had gone seven months without a release. Since then: **43 releases** and **300+ commits** on speed, battery, security and the features I wanted as a daily user. Everything listed under *What's new* was built here. Issues and pull requests are welcome.
+> &nbsp;&nbsp;&nbsp;— [@Blackyfi](https://github.com/Blackyfi)
+
+## What's new in Revived
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### ⚡ Faster and lighter
+- Opens without waiting for extensions to load
+- Video starts **2 s after the first working host**, instead of waiting for all of them
+- Library, Updates and History pause while hidden
+- Download worker sleeps when you're offline
+
+</td>
+<td width="50%" valign="top">
+
+### 🔒 Safer by default
+- Only extensions signed by a repo you added can load
+- Backups are restored as untrusted input
+- Passwords, tokens and cookies are scrubbed from shared logs
+- Every APK is built in CI, attested and scanned
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🧲 Torrent streaming
+- Stream episodes and read chapters from torrents and magnet links
+- Built-in torrent server, with its own settings screen
+- Works on networks that block DNS
+
+</td>
+<td valign="top">
+
+### 📚 Library that fits how you read
+- **Manhwa tab**, sorted automatically from genre and language
+- **Switch source per entry** without losing progress
+- **Content language**: one setting for manga, anime and subtitles
+- Undo from the snackbar
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🎬 Player and reader
+- Errors stay on screen with Retry / Switch host / WebView
+- Next episode is prepared during the last two minutes
+- Reader loads two pages at once, preload 2–12 pages
+
+</td>
+<td valign="top">
+
+### ⬇️ Downloads and updates
+- Parallel downloads, with a speed test to suggest a value
+- Auto-download per entry
+- Library updates every 6 h, inside a time window you choose
+- External downloaders: 1DM, ADM, FluxDown, AB Download Manager
+
+</td>
+</tr>
+</table>
+
+## Benchmarks
+
+Revived against the latest upstream Aniyomi, on the same phone with the same library.
+
+| | Aniyomi v0.18.2.1 | **Revived v0.18.1.47** | |
+|---|--:|--:|---|
+| **Cold start** to first frame | 870 ms | **585 ms** | 🟢 **33% faster** |
+| **Download size** (arm64 APK) | 83.4 MB | **75.5 MB** | 🟢 **9% smaller** |
+| **Memory** after launch | 138 MB | **137 MB** | ⚪ same, while drawing real covers |
+
+<details>
+<summary>How this was measured</summary>
+
+Samsung Galaxy S24 Ultra, Android 17, November 2026. Both apps installed side by side with the same library restored from one backup. Cold start is the median of 12 alternating `am start -S -W` launches after a warm-up (Revived 552–602 ms, Aniyomi 852–897 ms: the ranges don't overlap). Memory is total PSS from `dumpsys meminfo`, 8 s after launch on the manga library, median of 3. In that test Aniyomi could not load the covers, so Revived was doing more work. Size is the release APK from each project's GitHub page.
+</details>
+
+### Fixed along the way
+
+| | Before | Now |
+|---|---|---|
+| MyAnimeList search | up to ~100 requests | **1 request** |
+| Download progress notifications | one every 50 ms | throttled |
+| Cloudflare challenge that needs a click | 30 s timeout | **fails at once** |
+| Reader auto background on large scans | full page decode (100 MB+) | **no full decode** |
+| Extension update check | every launch | **once a day** |
+| Idle torrent server | runs until closed | **stops after 5 min** |
+| Splash screen | fixed minimum time | **none** |
 
 ## Download
 
-[![Aniyomi Stable](https://img.shields.io/github/release/Blackyfi/aniyomi-revived.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/Blackyfi/aniyomi-revived/releases)
+[![Download for arm64](https://img.shields.io/badge/Download-arm64--v8a-818cf8?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Blackyfi/aniyomi-revived/releases/latest)
 
-<sub><b>Released November 20, 2026</b></sub><br>
-<sub>Previous: <a href="https://github.com/Blackyfi/aniyomi-revived/releases/tag/v0.18.1.46">v0.18.1.46</a>, November 14, 2026</sub>
+| APK | For |
+|---|---|
+| `arm64-v8a` | **Almost every phone from the last 7 years. Pick this one if unsure.** |
+| `armeabi-v7a` | Older or low-end 32-bit phones |
+| `x86` / `x86_64` | Emulators, some Chromebooks |
+| universal | Any device (about 3× larger) |
 
-*Requires Android 8.0 or higher.*
-
-</div>
-
-## Verifying a download
-
-This app is safe to install, and you shouldn't have to take my word for it. Every release is built by GitHub Actions straight from this repository, never by hand, then signed, attested and scanned on VirusTotal, with checksums listed in the release notes. If you'd rather check for yourself, upload the APK to [VirusTotal](https://www.virustotal.com/) or any scanner you trust, or use the checks below.
-
-**It was built from this source.** Each APK comes with a build attestation signed by GitHub, recording the exact commit and workflow run that produced it. With the [GitHub CLI](https://cli.github.com/):
-
-```
-gh attestation verify aniyomi-v0.18.1.46.apk --repo Blackyfi/aniyomi-revived
-```
-
-All attestations are also listed on the [attestations page](https://github.com/Blackyfi/aniyomi-revived/attestations).
-
-**It is signed by me.** Every release is signed with the same key. Its certificate SHA-256 fingerprint is:
-
-```
-6D:16:C0:9F:5D:EB:49:1B:A6:BE:5B:72:5E:15:82:8C:B4:EE:A1:98:A2:9C:DE:9A:45:23:71:36:17:D4:81:EF
-```
-
-On Android, [AppVerifier](https://github.com/soupslurpr/AppVerifier) can compare it for you; on a computer, run `apksigner verify --print-certs` on the APK. Android also refuses to install an update signed with a different key over an existing install.
-
-**It was scanned.** Each release APK is sent to VirusTotal, and the scan links are added at the bottom of the release notes. The phone builds (arm64-v8a, armeabi-v7a) come back clean. One engine out of about 67, Elastic, flags the x86 and Universal builds as "Asacub". That's a false positive: its rule is a single 22-byte pattern, and it matches an ordinary JNI call (`NewGlobalRef`) in the video player's library (`lib/x86/libplayer.so`), which has been there unchanged since the first release. The ARM builds use different machine code, so the rule can't match them. I've reported it to Elastic ([elastic/protections-artifacts#142](https://github.com/elastic/protections-artifacts/issues/142)).
-
-The full source is here, so anything above can be traced back to the code.
-
-<div align="center">
+Requires **Android 8.0+**. Installs alongside other Aniyomi builds (it has its own app ID).
 
 ## Features
 
-<div align="left">
+- **Watch:** mpv-based player with gestures, filters, Lua scripts, picture-in-picture and AniSkip
+- **Read:** paged, long-strip and webtoon viewers, with configurable reading direction
+- **Track:** MyAnimeList, AniList, Kitsu, MangaUpdates, Shikimori, Simkl, Bangumi
+- **Organize:** categories, filters, sorting, and a separate Manhwa tab
+- **Offline:** downloads, local content, and backups to any folder or cloud
+- **Extensions:** install sources from any repo you add; only signed ones load
 
-* Local reading and watching of content.
-* A configurable reader with multiple viewers, reading directions and other settings.
-* A configurable player built on mpv-android with multiple options and settings.
-* Tracker support: [MyAnimeList](https://myanimelist.net/), [AniList](https://anilist.co/), [Kitsu](https://kitsu.app/), [MangaUpdates](https://mangaupdates.com), [Shikimori](https://shikimori.one), [Simkl](https://simkl.com/), and [Bangumi](https://bgm.tv/) support.
-* Categories to organize your library.
-* Light and dark themes.
-* Schedule updating your library for new chapters/episodes.
-* Create backups locally to read/watch offline or to your desired cloud service.
-* Plus much more...
+## Verify a download
 
-</div>
+Every release is built by GitHub Actions from this repository, signed with one key, attested, and scanned on VirusTotal. You don't have to take my word for it:
+
+<details>
+<summary><b>Check it was built from this source</b></summary>
+
+```sh
+gh attestation verify aniyomi-arm64-v8a-vX.Y.Z.apk --repo Blackyfi/aniyomi-revived
+```
+All attestations: [attestations page](https://github.com/Blackyfi/aniyomi-revived/attestations).
+</details>
+
+<details>
+<summary><b>Check the signing certificate</b></summary>
+
+SHA-256:
+```
+6D:16:C0:9F:5D:EB:49:1B:A6:BE:5B:72:5E:15:82:8C:B4:EE:A1:98:A2:9C:DE:9A:45:23:71:36:17:D4:81:EF
+```
+On Android use [AppVerifier](https://github.com/soupslurpr/AppVerifier); on a computer, `apksigner verify --print-certs <apk>`.
+</details>
+
+<details>
+<summary><b>About the one VirusTotal flag on x86 / universal builds</b></summary>
+
+The phone builds (arm64-v8a, armeabi-v7a) scan clean. One engine of about 67, Elastic, flags the x86 and universal builds as "Asacub". It's a false positive: the rule is a single 22-byte pattern that matches an ordinary JNI call (`NewGlobalRef`) in the video player library (`lib/x86/libplayer.so`), unchanged since the first release. Reported upstream: [elastic/protections-artifacts#142](https://github.com/elastic/protections-artifacts/issues/142).
+</details>
 
 ## Contributing
 
-[Code of conduct](./CODE_OF_CONDUCT.md) · [Contributing guide](./CONTRIBUTING.md)
+Bug reports and pull requests are welcome. Please read the [contributing guide](./CONTRIBUTING.md) and [code of conduct](./CODE_OF_CONDUCT.md), and open an issue before larger changes. Report bugs in [this repository's issues](https://github.com/Blackyfi/aniyomi-revived/issues), not upstream's.
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## Credits
 
-Before reporting a new issue, take a look at the [FAQ](https://aniyomi.org/docs/faq/general), the [changelog](https://aniyomi.org/changelogs/) and the already opened [issues](https://github.com/aniyomiorg/aniyomi/issues); if you got any questions, join our [Discord server](https://discord.gg/F32UjdJZrR).
+Revived stands on years of work by the [Aniyomi](https://github.com/aniyomiorg/aniyomi/graphs/contributors), [Mihon](https://github.com/mihonapp/mihon) and Tachiyomi contributors, and on [mpv-android](https://github.com/mpv-android/mpv-android). Thank you.
 
-### Repositories
+<a href="https://github.com/aniyomiorg/aniyomi/graphs/contributors"><img src="https://contrib.rocks/image?repo=aniyomiorg/aniyomi" width="600" alt="Aniyomi contributors"/></a>
 
-[![aniyomiorg/aniyomi-website - GitHub](https://github-readme-stats.vercel.app/api/pin/?username=aniyomiorg&repo=aniyomi-website&bg_color=161B22&text_color=c9d1d9&title_color=818cf8&icon_color=818cf8&border_radius=8&hide_border=true&description_lines_count=2)](https://github.com/aniyomiorg/aniyomi-website/)
-[![aniyomiorg/aniyomi-mpv-lib - GitHub](https://github-readme-stats.vercel.app/api/pin/?username=aniyomiorg&repo=aniyomi-mpv-lib&bg_color=161B22&text_color=c9d1d9&title_color=818cf8&icon_color=818cf8&border_radius=8&hide_border=true&description_lines_count=2)](https://github.com/aniyomiorg/aniyomi-mpv-lib/)
+## Disclaimer
 
-### Credits
+This app hosts no content and has no affiliation with any content provider. Sources come from extensions that you choose to install.
 
-Thank you to all the people who have contributed!
+<details>
+<summary><b>License</b> — Apache 2.0</summary>
 
-<a href="https://github.com/aniyomiorg/aniyomi/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=aniyomiorg/aniyomi" alt="Aniyomi app contributors" title="Aniyomi app contributors" width="800"/>
-</a>
-
-### Disclaimer
-
-The developer(s) of this application does not have any affiliation with the content providers available, and this application hosts zero content.
-
-### License
-
-<pre>
+```
 Copyright © 2015 Javier Tomás
 Copyright © 2024 Mihon Open Source Project
 Copyright © 2024 Aniyomi Open Source Project
+Copyright © 2026 Blackyfi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-</pre>
-
-</div>
+```
+</details>
