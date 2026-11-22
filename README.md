@@ -26,7 +26,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 
 > [!NOTE]
 > **About this fork.** I started Revived in May 2026, when Aniyomi had gone seven months without a release. Since then: **43 releases** and **300+ commits** on speed, battery, security and the features I wanted as a daily user. Everything listed under *What's new* was built here. Issues and pull requests are welcome.
-> &nbsp;&nbsp;&nbsp;— [@Blackyfi](https://github.com/Blackyfi)
+> [@Blackyfi](https://github.com/Blackyfi)
 
 ## What's new in Revived
 
@@ -34,7 +34,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 <tr>
 <td width="50%" valign="top">
 
-### ⚡ Faster and lighter
+### Faster and lighter
 - Opens without waiting for extensions to load
 - Video starts **2 s after the first working host**, instead of waiting for all of them
 - Library, Updates and History pause while hidden
@@ -43,7 +43,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 </td>
 <td width="50%" valign="top">
 
-### 🔒 Safer by default
+### Safer by default
 - Only extensions signed by a repo you added can load
 - Backups are restored as untrusted input
 - Passwords, tokens and cookies are scrubbed from shared logs
@@ -54,7 +54,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 <tr>
 <td valign="top">
 
-### 🧲 Torrent streaming
+### Torrent streaming
 - Stream episodes and read chapters from torrents and magnet links
 - Built-in torrent server, with its own settings screen
 - Works on networks that block DNS
@@ -62,7 +62,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 </td>
 <td valign="top">
 
-### 📚 Library that fits how you read
+### Library that fits how you read
 - **Manhwa tab**, sorted automatically from genre and language
 - **Switch source per entry** without losing progress
 - **Content language**: one setting for manga, anime and subtitles
@@ -73,7 +73,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 <tr>
 <td valign="top">
 
-### 🎬 Player and reader
+### Player and reader
 - Errors stay on screen with Retry / Switch host / WebView
 - Next episode is prepared during the last two minutes
 - Reader loads two pages at once, preload 2–12 pages
@@ -81,7 +81,7 @@ An independent fork of [Aniyomi](https://github.com/aniyomiorg/aniyomi), with it
 </td>
 <td valign="top">
 
-### ⬇️ Downloads and updates
+### Downloads and updates
 - Parallel downloads, with a speed test to suggest a value
 - Auto-download per entry
 - Library updates every 6 h, inside a time window you choose
@@ -97,9 +97,9 @@ Revived against the latest upstream Aniyomi, on the same phone with the same lib
 
 | | Aniyomi v0.18.2.1 | **Revived v0.18.1.47** | |
 |---|--:|--:|---|
-| **Cold start** to first frame | 870 ms | **585 ms** | 🟢 **33% faster** |
-| **Download size** (arm64 APK) | 83.4 MB | **75.5 MB** | 🟢 **9% smaller** |
-| **Memory** after launch | 138 MB | **137 MB** | ⚪ same, while drawing real covers |
+| **Cold start** to first frame | 870 ms | **585 ms** | **33% faster** |
+| **Download size** (arm64 APK) | 83.4 MB | **75.5 MB** | **9% smaller** |
+| **Memory** after launch | 138 MB | **137 MB** | same, while drawing real covers |
 
 <details>
 <summary>How this was measured</summary>
@@ -185,7 +185,7 @@ Revived stands on years of work by the [Aniyomi](https://github.com/aniyomiorg/a
 This app hosts no content and has no affiliation with any content provider. Sources come from extensions that you choose to install.
 
 <details>
-<summary><b>License</b> — Apache 2.0</summary>
+<summary><b>License</b> (Apache 2.0)</summary>
 
 ```
 Copyright © 2015 Javier Tomás
