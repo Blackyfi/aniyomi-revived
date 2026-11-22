@@ -20,8 +20,13 @@ package eu.kanade.tachiyomi.ui.player.controls.components
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,4 +60,26 @@ fun TextPlayerUpdate(
     PlayerUpdate(modifier) {
         Text(text)
     }
+}
+
+@Composable
+fun HoldSpeedPlayerUpdate(
+    speed: Float,
+    modifier: Modifier = Modifier,
+) {
+    PlayerUpdate(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(formatHoldSpeed(speed))
+            Icon(
+                imageVector = Icons.Filled.FastForward,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+private fun formatHoldSpeed(speed: Float): String {
+    val label = if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()
+    return "${label}x"
 }
