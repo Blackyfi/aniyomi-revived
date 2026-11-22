@@ -126,6 +126,11 @@
     <string name="pref_player_smooth_seek">Enable precise seeking</string>
     <string name="pref_player_smooth_seek_summary">When enabled, seeking will not focus on keyframes, leading to slower but precise seeking</string>
     <string name="pref_category_double_tap">Double tap</string>
+    <string name="pref_category_long_press">Long press</string>
+    <string name="pref_long_press_gesture">Long press on the video</string>
+    <string name="long_press_speed_up">Speed up while held</string>
+    <string name="long_press_screenshot">Open screenshot menu</string>
+    <string name="pref_hold_speed">Speed while holding</string>
     <string name="pref_left_double_tap">Double tap (left)</string>
     <string name="pref_center_double_tap">Double tap (center)</string>
     <string name="pref_right_double_tap">Double tap (right)</string>
@@ -347,6 +352,7 @@
     <string name="player_sheets_add_ext_sub">Add external subtitles</string>
     <string name="player_sheets_subtitles_footer_secondary_sid_no_styles">Secondary subtitles will have no ASS/SSA Styling.</string>
     <!-- Sheets - screenshot -->
+    <string name="player_action_screenshot">Screenshot</string>
     <string name="screenshot_show_subs">Include Subtitles</string>
     <!-- Sheets - Chapters -->
     <string name="player_sheets_chapters_title">Chapters</string>

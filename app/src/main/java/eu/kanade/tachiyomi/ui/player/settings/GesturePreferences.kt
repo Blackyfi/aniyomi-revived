@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.player.settings
 
+import eu.kanade.tachiyomi.ui.player.LongPressGesture
 import eu.kanade.tachiyomi.ui.player.SingleActionGesture
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
@@ -27,6 +28,11 @@ class GesturePreferences(
     fun leftDoubleTapGesture() = preferenceStore.getEnum("pref_left_double_tap", SingleActionGesture.Seek)
     fun centerDoubleTapGesture() = preferenceStore.getEnum("pref_center_double_tap", SingleActionGesture.PlayPause)
     fun rightDoubleTapGesture() = preferenceStore.getEnum("pref_right_double_tap", SingleActionGesture.Seek)
+
+    // Long press
+
+    fun longPressGesture() = preferenceStore.getEnum("pref_long_press_gesture", LongPressGesture.SpeedUp)
+    fun holdSpeed() = preferenceStore.getFloat("pref_hold_speed", 2f)
 
     // Media controls
 

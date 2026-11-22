@@ -67,6 +67,15 @@ enum class SingleActionGesture(val stringRes: StringResource) {
 }
 
 /**
+ * Action performed by a long press on the video
+ */
+enum class LongPressGesture(val stringRes: StringResource) {
+    SpeedUp(stringRes = AYMR.strings.long_press_speed_up),
+    Screenshot(stringRes = AYMR.strings.long_press_screenshot),
+    None(stringRes = AYMR.strings.single_action_none),
+}
+
+/**
  * Key codes sent through the `Custom` option in gestures
  */
 enum class CustomKeyCodes(val keyCode: String) {
@@ -132,7 +141,7 @@ sealed class Dialogs {
 
 sealed class PlayerUpdates {
     data object None : PlayerUpdates()
-    data object DoubleSpeed : PlayerUpdates()
+    data class HoldSpeed(val speed: Float) : PlayerUpdates()
     data object AspectRatio : PlayerUpdates()
     data class ShowText(val value: String) : PlayerUpdates()
     data class ShowTextResource(val textResource: StringResource) : PlayerUpdates()

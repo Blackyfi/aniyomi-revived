@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import eu.kanade.presentation.player.components.LeftSideOvalShape
 import eu.kanade.presentation.player.components.RightSideOvalShape
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.ui.player.LongPressGesture
 import eu.kanade.tachiyomi.ui.player.Panels
 import eu.kanade.tachiyomi.ui.player.PlayerUpdates
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
@@ -108,6 +109,9 @@ fun GestureHandler(
     val preciseSeeking by gesturePreferences.playerSmoothSeek().collectAsState()
     val showSeekbar by gesturePreferences.showSeekBar().collectAsState()
     var isLongPressing by remember { mutableStateOf(false) }
+    var isHoldingSpeed by remember { mutableStateOf(false) }
+    var speedBeforeHold by remember { mutableStateOf(1f) }
+    var pausedBeforeHold by remember { mutableStateOf(false) }
     val currentVolume by viewModel.currentVolume.collectAsState()
     val currentMPVVolume by viewModel.currentMPVVolume.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
@@ -119,7 +123,6 @@ fun GestureHandler(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeGestures)
             .pointerInput(Unit) {
-                val originalSpeed = viewModel.playbackSpeed.value
                 detectTapGestures(
                     onTap = {
                         if (controlsShown) viewModel.hideControls() else viewModel.showControls()
@@ -160,26 +163,41 @@ fun GestureHandler(
                         }
                         interactionSource.emit(press)
                         tryAwaitRelease()
-                        if (isLongPressing) {
-                            isLongPressing = false
-                            MPVLib.setPropertyDouble("speed", originalSpeed.toDouble())
+                        if (isHoldingSpeed) {
+                            isHoldingSpeed = false
+                            MPVLib.setPropertyDouble("speed", speedBeforeHold.toDouble())
                             viewModel.playerUpdate.update { PlayerUpdates.None }
+                            if (pausedBeforeHold) viewModel.pause()
                         }
+                        isLongPressing = false
                         interactionSource.emit(PressInteraction.Release(press))
                     },
                     onLongPress = {
-                        if (areControlsLocked) return@detectTapGestures
-                        if (!isLongPressing) {
+                        // A press right after a double tap seek is another seek tap, not a hold.
+                        if (areControlsLocked || isDoubleTapSeeking) return@detectTapGestures
+                        val longPressGesture = gesturePreferences.longPressGesture().get()
+                        if (!isLongPressing && longPressGesture != LongPressGesture.None) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             isLongPressing = true
-                            viewModel.pause()
-                            viewModel.sheetShown.update { Sheets.Screenshot }
+                            if (longPressGesture == LongPressGesture.SpeedUp) {
+                                val holdSpeed = gesturePreferences.holdSpeed().get()
+                                speedBeforeHold = viewModel.playbackSpeed.value
+                                pausedBeforeHold = viewModel.paused.value
+                                isHoldingSpeed = true
+                                MPVLib.setPropertyDouble("speed", holdSpeed.toDouble())
+                                viewModel.playerUpdate.update { PlayerUpdates.HoldSpeed(holdSpeed) }
+                                if (pausedBeforeHold) viewModel.unpause()
+                            } else {
+                                viewModel.pause()
+                                viewModel.sheetShown.update { Sheets.Screenshot }
+                            }
                         }
                     },
                 )
             }
-            .pointerInput(areControlsLocked) {
-                if (!seekGesture || areControlsLocked) return@pointerInput
+            .pointerInput(areControlsLocked, isHoldingSpeed) {
+                // While the video is held at speed, sliding the finger must not seek (it would also end the hold).
+                if (!seekGesture || areControlsLocked || isHoldingSpeed) return@pointerInput
                 var startingPosition = position.toInt()
                 var startingX = 0f
                 var wasPlayerAlreadyPause = false
@@ -212,8 +230,8 @@ fun GestureHandler(
                     if (showSeekbar) viewModel.showSeekBar()
                 }
             }
-            .pointerInput(areControlsLocked) {
-                if (!gestureVolumeBrightness || areControlsLocked) return@pointerInput
+            .pointerInput(areControlsLocked, isHoldingSpeed) {
+                if (!gestureVolumeBrightness || areControlsLocked || isHoldingSpeed) return@pointerInput
                 var startingY = 0f
                 var mpvVolumeStartingY = 0f
                 var originalVolume = currentVolume

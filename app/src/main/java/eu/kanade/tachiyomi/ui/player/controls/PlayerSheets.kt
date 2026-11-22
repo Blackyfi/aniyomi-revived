@@ -93,6 +93,7 @@ fun PlayerSheets(
     onSave: (() -> InputStream) -> Unit,
     takeScreenshot: (String, Boolean) -> InputStream?,
     onDismissScreenshot: () -> Unit,
+    onOpenScreenshot: () -> Unit,
 
     onOpenPanel: (Panels) -> Unit,
     onDismissRequest: () -> Unit,
@@ -168,6 +169,7 @@ fun PlayerSheets(
                 onStartTimer = onStartSleepTimer,
                 onDismissRequest = onDismissRequest,
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
+                onOpenScreenshot = onOpenScreenshot,
                 customButtons = buttons,
             )
         }
